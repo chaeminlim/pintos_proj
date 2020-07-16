@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-
+#include "threads/synch.h"
 
 
 /* States in a thread's life cycle. */
@@ -89,6 +89,13 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+struct file_descriptor
+{
+   struct file* file;
+   bool valid;
+};
+
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -107,10 +114,17 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-
+    struct list child_list;
+    struct list_elem child_list_elem;
+    struct semaphore sema_wait;
+    struct semaphore sema_exit;
+    struct thread* parent;
+    bool load_status;
+    int exit_code;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct file_descriptor fd_table[128];
 #endif
 
     /* Owned by thread.c. */

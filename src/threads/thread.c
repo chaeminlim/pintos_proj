@@ -179,7 +179,8 @@ thread_create (const char *name, int priority,
   struct switch_threads_frame *sf;
   tid_t tid;
   enum intr_level old_level;
-
+  struct thread* curr = thread_current();
+  
   ASSERT (function != NULL);
 
   /* Allocate thread. */
@@ -190,6 +191,10 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  
+  // set parent
+  t->parent = curr;
+  list_push_back(&curr->child_list, &t->child_list_elem);
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
@@ -256,7 +261,7 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
 
   //list_push_back (&ready_list, &t->elem);
-  list_insert_ordered(&ready_list, &t->elem, compare_priority, NULL);
+  list_insert_ordered(&ready_list, &t->elem, (list_less_func*)compare_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 
@@ -330,7 +335,7 @@ thread_yield (void)
   if (cur != idle_thread)
   {
     //list_sort(&ready_list, compare_priority, NULL);
-    list_insert_ordered (&ready_list, &cur->elem, compare_priority, NULL);
+    list_insert_ordered (&ready_list, &cur->elem, (list_less_func*)compare_priority, NULL);
   
   }
   cur->status = THREAD_READY;
@@ -521,6 +526,17 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nice = NICE_NORMAL;
   t->recent_cpu = RECENT_CPU_NORMAL;
   list_push_back (&all_list, &t->allelem);
+  // systemcall
+  t->exit_code = 0;  
+  list_init(&t->child_list);
+  sema_init(&t->sema_exit, 0);
+  sema_init(&t->sema_wait, 0);
+  t->load_status = false;
+  #ifdef USERPROG
+  // file descriptor init
+  int i = 0;
+  for(; i < 128; i++) t->fd_table[i].valid = false;
+  #endif
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -690,7 +706,7 @@ void calculate_load_avg_mlfqs(void)
 // 현재 ready list에서 가장 큰 priority를 찾아 리턴한다.
 int get_max_priority_ready(void)
 {
-  return  list_entry(list_min(&ready_list, compare_priority, NULL), struct thread, elem)->curr_priority;
+  return  list_entry(list_min(&ready_list, (list_less_func*)compare_priority, NULL), struct thread, elem)->curr_priority;
 }
 /* 모든 스레드의 recentcpu priority를 재계산한다*/
 void recalculate_recent_cpu_n_priority(void)

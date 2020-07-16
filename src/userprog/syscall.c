@@ -15,15 +15,30 @@
 static void syscall_handler (struct intr_frame *);
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static void
-syscall_handler (struct intr_frame *f) 
+syscall_handler (struct intr_frame *f)
 {
-  printf ("system call! number: %d\n", f->esp);
-  hex_dump( f->esp,  f->esp, PHYS_BASE -  f->esp, true);
-  thread_exit ();
+  printf ("system call!\n");
+  //printf ("system call! number: %d\n", f->esp);
+  //hex_dump( f->esp,  f->esp, PHYS_BASE -  f->esp, true);
+  thread_exit (); 
+}
+
+
+void syscall_halt(void)
+{
+  shutdown_power_off();
+}
+
+void syscall_exit(int status)
+{
+  struct thread* t = thread_current();
+  //t->exit_status = status;
+  printf("%s: exit(%d)\n", t->name, status);
+  thread_exit();
 }
