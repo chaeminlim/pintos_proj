@@ -5,7 +5,9 @@
 
 void syscall_init (void);
 
+
 void is_safe_addr(const void *vaddr);
+
 
 void syscall_halt(void);
 void syscall_exit(int status);

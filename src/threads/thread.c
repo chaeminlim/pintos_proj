@@ -527,6 +527,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->recent_cpu = RECENT_CPU_NORMAL;
   list_push_back (&all_list, &t->allelem);
   list_init(&t->child_list);
+
   #ifdef USERPROG
   // file descriptor init
   int i = 0;
@@ -538,6 +539,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->pcb.exitcode = -1;
   sema_init(&t->pcb.sema_load, 0);
   sema_init(&t->pcb.sema_wait, 0);  
+
   #endif
 }
 
@@ -742,6 +744,8 @@ struct thread* get_thread_by_id(tid_t tid)
   return NULL;
 }
 
+
+}
 
 int allocate_fd_id(struct thread* t)
 {

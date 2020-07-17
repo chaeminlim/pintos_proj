@@ -10,6 +10,7 @@
 #include "threads/vaddr.h"
 #include "threads/palloc.h"
 #include "lib/stdio.h"
+#include "lib/kernel/stdio.h"
 #include "devices/input.h"
 
 static void syscall_handler (struct intr_frame *);
@@ -19,9 +20,13 @@ void is_safe_addr(const void *vaddr);
 struct lock file_lock;
 
 
+struct lock syscall_file_lock;
+
+
 void
 syscall_init (void)
 {
+
   lock_init(&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
@@ -33,110 +38,137 @@ syscall_handler (struct intr_frame *f)
   //printf ("system call! number: %d\n", f->esp);
   //hex_dump( f->esp,  f->esp, PHYS_BASE -  f->esp, true);
   int syscall_number = *(int*)(f->esp);
+
   switch(syscall_number)
   {
     case SYS_HALT:
     {
       syscall_halt();
+
       NOT_REACHED();
+
       break;
     }
     case SYS_EXIT:
     {
+
       is_safe_addr(f->esp + 4);
       syscall_exit(*(int*)(f->esp + 4));
       NOT_REACHED();
+
       break;
     }
     case SYS_EXEC:
     {
+
       is_safe_addr(f->esp + 4);
       void* cmd_line = f->esp + 4;
       int return_code = syscall_exec((const char*)cmd_line);
       f->eax = (uint32_t) return_code;
+
       break;
     }
     case SYS_WAIT:
     {
+
       is_safe_addr(f->esp + 4);
       pid_t pid = *(int*)(f->esp + 4);
       int ret = syscall_wait(pid);
       f->eax = (uint32_t) ret;
+
       break;
     }
     case SYS_CREATE:
     {
+
       is_safe_addr(f->esp + 4);
       is_safe_addr(f->esp + 8);
       char** file = (char*)(f->esp + 4);
       unsigned int initial_size = *(unsigned int*)(f->esp + 8);
+
       f->eax = syscall_create(*file, initial_size);
       break;
     }
     case SYS_REMOVE:
     {
+
       is_safe_addr(f->esp + 4);
       char** file = (char*)(f->esp + 4);
+
       f->eax = syscall_remove(*file);
       break;
     }
     case SYS_OPEN:
     {
+
       is_safe_addr(f->esp + 4);
       char* file = (char*)(f->esp + 4);
+
       f->eax = syscall_open(file);
       break;
     }
     case SYS_FILESIZE:
     {
+
       is_safe_addr(f->esp + 4);
       int fd = *(int*)(f->esp+4);
+
       f->eax = syscall_filesize(fd);
       break;
     }
     case SYS_READ:
     {
+
       is_safe_addr(f->esp + 12);
       is_safe_addr(f->esp + 8);
       is_safe_addr(f->esp + 4);
       unsigned int size = *(unsigned int*)(f->esp+12);
       void** buffer = (f->esp+8);
       int fd = *(int*)(f->esp+4);
+
       f->eax = syscall_read(fd, *buffer, size);
       break;
     }
     case SYS_WRITE:
     {
+
       is_safe_addr(f->esp + 12);
       is_safe_addr(f->esp + 8);
       is_safe_addr(f->esp + 4);
       unsigned int size = *(unsigned int*)(f->esp+12);
       void** buffer = (f->esp+8);
       int fd = *(int*)(f->esp+4);
+
       //printf("fd %d, buffer %s, size %u\n", fd, (char*)buffer, size);
       f->eax = syscall_write(fd, *buffer, size);
       break;
     }
     case SYS_SEEK:
     {
+
       is_safe_addr(f->esp + 8);
       is_safe_addr(f->esp + 4);
       unsigned int position = *(unsigned*)(f->esp+8);
       int fd = *(int*)(f->esp+4);
+
       syscall_seek(fd, position);
       break;
     }
     case SYS_TELL:
     {
+
       is_safe_addr(f->esp + 4);
       int fd = *(int*)(f->esp+4);
+
       f->eax = syscall_tell(fd);
       break;
     }
     case SYS_CLOSE:
     {
+
       is_safe_addr(f->esp + 4);
       int fd = *(int*)(f->esp+4);
+
       syscall_close(fd);
       break;
     }
@@ -147,14 +179,15 @@ syscall_handler (struct intr_frame *f)
   }
 }
 
-
+// finished
 void syscall_halt(void)
 {
   shutdown_power_off();
 }
-
+// not finished
 void syscall_exit(int status)
 {
+
   struct thread* curr = thread_current();
   //t->exit_status = status;
   printf("%s: exit(%d)\n", curr->name, status);
@@ -181,7 +214,9 @@ int syscall_wait(pid_t pid)
 
 bool syscall_create(const char* file, unsigned initial_size)
 {
+
   is_safe_addr((const uint8_t*)file);
+
   if(filesys_create(file, initial_size))
   {
     return true;
@@ -191,7 +226,9 @@ bool syscall_create(const char* file, unsigned initial_size)
 // finished
 bool syscall_remove(const char* file)
 {
+
   is_safe_addr((const uint8_t*)file);
+
   if(filesys_remove(file))
   {
     return true;
@@ -231,16 +268,20 @@ void syscall_close(int fd)
 // finished
 int syscall_open(char *file)
 {
+
   is_safe_addr((const uint8_t*)file);
   struct file* opened_file = NULL;
   int fd_num;
   struct thread* curr = thread_current();
   lock_acquire(&file_lock);
 
+
   opened_file = filesys_open(file);
   if(opened_file == NULL)
   {
+
     lock_release(&file_lock);
+
     return -1;
   }
   else
@@ -251,16 +292,20 @@ int syscall_open(char *file)
     curr->fd_table[fd_num].file = opened_file;
     curr->fd_table[fd_num].valid = true;
     
+
     lock_release(&file_lock);
+
     return fd_num;
   }
 }
 
 int syscall_read(int fd, void* buffer, unsigned size)
 {
+
   is_safe_addr((const uint8_t*)buffer);
   struct thread* curr = thread_current();
   lock_acquire(&file_lock);
+
   if(fd == 0)
   {
     unsigned int i = 0;
@@ -268,7 +313,9 @@ int syscall_read(int fd, void* buffer, unsigned size)
     {
       ((char*)buffer)[i] = input_getc();
     }
+
     lock_release(&file_lock);
+
     return size;
   }
   else
@@ -276,21 +323,27 @@ int syscall_read(int fd, void* buffer, unsigned size)
     if(curr->fd_table[fd].valid == false) return -1;
     
     int ret = file_read(curr->fd_table[fd].file, buffer, size);
+
     lock_release(&file_lock);
+
     return ret;
   }
 }
 
 int syscall_write(int fd, const void* buffer, unsigned size)
 {
+
   is_safe_addr((const uint8_t*)buffer);
   struct thread* curr = thread_current();
   lock_acquire(&file_lock);
 
+
   if(fd == 1)
   {
     putbuf((char*)buffer, size);
+
     lock_release(&file_lock);
+
     return size;
   }
   else
@@ -298,7 +351,9 @@ int syscall_write(int fd, const void* buffer, unsigned size)
     if(curr->fd_table[fd].valid == false) return -1;
     
     int ret = file_write(curr->fd_table[fd].file, buffer, size);
+
     lock_release(&file_lock);
+
     return ret;
   }
 }
@@ -311,3 +366,4 @@ void is_safe_addr(const void *vaddr)
       syscall_exit(-1);
     }
 }
+

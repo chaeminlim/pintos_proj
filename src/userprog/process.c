@@ -77,6 +77,7 @@ start_process (void *file_name_)
 
   if (!success) 
     syscall_exit(-1);
+
   //set_args_in_stack(file_name, &if_.esp);
 
   palloc_free_page (pg_round_down(file_name));  

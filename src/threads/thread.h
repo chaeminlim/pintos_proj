@@ -126,6 +126,7 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     struct list child_list;
+
     struct process_control_block pcb;             /* Page directory. */
     
 #ifdef USERPROG
@@ -133,6 +134,7 @@ struct thread
     uint32_t *pagedir;     
     struct file_descriptor fd_table[128];
     uint8_t* curr_esp;
+
 #endif
 
     /* Owned by thread.c. */
@@ -184,6 +186,8 @@ int get_max_priority_ready(void);
 void recalculate_recent_cpu_n_priority(void);
 void calculate_load_avg_mlfqs(void);
 void increase_recent_cpu(void);
+
 struct thread* get_thread_by_id(tid_t);
 int allocate_fd_id(struct thread* t);
+
 #endif /* threads/thread.h */
