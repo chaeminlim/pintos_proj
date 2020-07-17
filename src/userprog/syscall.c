@@ -50,8 +50,8 @@ syscall_handler (struct intr_frame *f)
     case SYS_EXEC:
     {
       is_safe_addr(temp_esp+4);
-      char* cmd_line = (char*)(temp_esp+4);
-      f->eax = syscall_exec(cmd_line);
+      char** cmd_line = (char*)(temp_esp+4);
+      f->eax = syscall_exec(*cmd_line);
       break;
     }
     case SYS_WAIT:
@@ -65,16 +65,16 @@ syscall_handler (struct intr_frame *f)
     {
       is_safe_addr(temp_esp + 4);
       is_safe_addr(temp_esp + 8);
-      char* file = (char*)(temp_esp + 4);
+      char** file = (char*)(temp_esp + 4);
       unsigned int initial_size = *(unsigned int*)(temp_esp + 8);
-      f->eax = syscall_create(file, initial_size);
+      f->eax = syscall_create(*file, initial_size);
       break;
     }
     case SYS_REMOVE:
     {
       is_safe_addr(temp_esp + 4);
-      char* file = (char*)(temp_esp + 4);
-      f->eax = syscall_remove(file);
+      char** file = (char*)(temp_esp + 4);
+      f->eax = syscall_remove(*file);
       break;
     }
     case SYS_OPEN:
