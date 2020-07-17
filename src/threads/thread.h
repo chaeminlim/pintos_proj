@@ -118,13 +118,15 @@ struct thread
     struct list_elem child_list_elem;
     struct semaphore sema_wait;
     struct semaphore sema_exit;
+    struct semaphore sema_load;
     struct thread* parent;
     bool load_status;
     int exit_code;
+    struct file_descriptor fd_table[128];
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    struct file_descriptor fd_table[128];
+    
 #endif
 
     /* Owned by thread.c. */
@@ -177,4 +179,7 @@ void recalculate_recent_cpu_n_priority(void);
 void calculate_load_avg_mlfqs(void);
 void increase_recent_cpu(void);
 
+   /* related with systemcalls*/
+struct thread* get_child_thread(struct thread*, tid_t);
+int allocate_fd_id(struct thread*);
 #endif /* threads/thread.h */

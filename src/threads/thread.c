@@ -531,11 +531,23 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init(&t->child_list);
   sema_init(&t->sema_exit, 0);
   sema_init(&t->sema_wait, 0);
+  sema_init(&t->sema_load, 0);
   t->load_status = false;
   #ifdef USERPROG
   // file descriptor init
   int i = 0;
-  for(; i < 128; i++) t->fd_table[i].valid = false;
+  for(; i < 3; i++) 
+  {
+    t->fd_table[i].file = NULL;
+    t->fd_table[i].valid = true;
+  }
+  i = 3;
+  for(; i < 128; i++) 
+  {
+    t->fd_table[i].file = NULL;
+    t->fd_table[i].valid = false;
+  }
+  
   #endif
 }
 
@@ -729,6 +741,31 @@ void increase_recent_cpu(void)
   thr->recent_cpu = add_fp(fp_recent, F);
 }
 
+struct thread* get_child_thread(struct thread* t, tid_t tid)
+{
+  if(t == NULL) return NULL;
+  if(list_empty(&t->child_list)) return NULL;
+  else
+  {
+    struct list_elem* e = list_front(&t->child_list);
+    for(; e != list_end(&t->child_list); e = list_next(e))
+    {
+      if(list_entry(e, struct thread, child_list_elem)->tid == tid)
+      { return list_entry(e, struct thread, child_list_elem); }
+    }
+  }
+  return NULL;
+}
 
+int allocate_fd_id(struct thread* t)
+{
+  int i = 3;
+  for(; i < 128; i++)
+  {
+    if(t->fd_table[i].valid == false) return i;
+  }
+  return -1;
+
+}
 
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);

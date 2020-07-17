@@ -68,9 +68,20 @@ start_process (void *file_name_)
 
   success = load (file_name, &if_.eip, &if_.esp);
   /* If load failed, quit. */
-  
+  struct thread* curr = thread_current();
+
   if (!success) 
+  {
+    curr->load_status = false;
+    sema_up(&curr->parent->sema_load); 
     thread_exit ();
+  }
+  else
+  {
+    curr->load_status = true;
+    sema_up(&curr->parent->sema_load);
+  }
+    
   //set_args_in_stack(file_name, &if_.esp);
 
   palloc_free_page (pg_round_down(file_name));  
@@ -82,7 +93,7 @@ start_process (void *file_name_)
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
 
-  hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
+  //hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
 
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
