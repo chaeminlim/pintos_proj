@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -39,16 +40,19 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   exe_name = strtok_r(fn_copy, " ", &save_ptr);
-  
   /* Create a new thread to execute ;FILE_NAME. */
   tid = thread_create(exe_name, PRI_DEFAULT, start_process, save_ptr);
-
+  // wait until initialization inside start_process() is complete
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+  {
+    palloc_free_page (fn_copy);
+    return tid; 
+  }
+  struct thread* child = get_thread_by_id(tid);
+  if(child == NULL) return TID_ERROR;
+  sema_down(&child->pcb.sema_load);
   
-  
-  return tid; 
-  // 실행된 프로세스의 tid 를 리턴한다.
+  return tid;
 }
 
 /* A thread function that loads a user process and starts it
@@ -56,6 +60,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
+  struct thread *t = thread_current();
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
@@ -68,9 +73,10 @@ start_process (void *file_name_)
 
   success = load (file_name, &if_.eip, &if_.esp);
   /* If load failed, quit. */
-  
+  sema_up(&t->pcb.sema_load);
+
   if (!success) 
-    thread_exit ();
+    syscall_exit(-1);
   //set_args_in_stack(file_name, &if_.esp);
 
   palloc_free_page (pg_round_down(file_name));  
@@ -82,7 +88,7 @@ start_process (void *file_name_)
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
 
-  hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
+  //hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
 
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
@@ -98,9 +104,39 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  return -1;
+  struct thread *t = thread_current ();
+  struct list *child_list = &(t->child_list);
+  // lookup the process with tid equals 'child_tid' from 'child_list'
+  struct process_control_block *child_pcb = NULL;
+  struct list_elem *e = NULL;
+  if (!list_empty(child_list)) 
+  {
+    e = list_front(child_list);
+    for (; e != list_end(child_list); e = list_next(e)) 
+    {
+      struct process_control_block *pcb = 
+      list_entry(e, struct process_control_block, child_elem);
+
+      if(pcb->pid == child_tid) 
+      { // OK, the direct child found
+        child_pcb = pcb;
+        break;
+      }
+    }
+  }
+  if (child_pcb == NULL) return -1;
+  if (child_pcb->waiting) return -1;
+  else child_pcb->waiting = true;
+
+  // wait  child terminates
+  if (! child_pcb->exited) sema_down(& (child_pcb->sema_wait));
+  ASSERT (child_pcb->exited == true);
+  ASSERT (e != NULL);
+  list_remove(e);
+  // return the exit code of the child process
+  return child_pcb->exitcode;
 }
 
 /* Free the current process's resources. */
@@ -109,6 +145,25 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  // clear fd
+  
+  // clear child
+  struct list *child_list = &cur->child_list;
+  while (!list_empty(child_list)) 
+  {
+    struct list_elem *e = list_pop_front (child_list);
+    struct process_control_block *pcb;
+    pcb = list_entry(e, struct process_control_block, child_elem);
+    if (pcb->exited != true) 
+    {
+      pcb->orphan = true;
+      pcb->parent = NULL;
+    }
+  }
+
+  cur->pcb.exited = true;
+  sema_up (&cur->pcb.sema_wait);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -531,6 +586,10 @@ setup_stack (void **esp, const char* arguments)
         /*push return address*/
         *esp -= 4;
         * (uint32_t *) *esp = 0x0;
+       
+      
+        //hex_dump( *esp,  *esp, PHYS_BASE -  *esp, true);
+        //printf("\n");
       }
         
       else

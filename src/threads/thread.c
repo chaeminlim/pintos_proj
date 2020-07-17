@@ -191,10 +191,11 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-  
+
   // set parent
-  t->parent = curr;
-  list_push_back(&curr->child_list, &t->child_list_elem);
+  t->pcb.parent = curr;
+  t->pcb.pid = tid;
+  list_push_back(&curr->child_list, &t->pcb.child_elem);
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
@@ -220,7 +221,6 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-
 
   /* Yield for preemption. */
   if (t->curr_priority > thread_get_priority ()) thread_yield ();
@@ -526,16 +526,18 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nice = NICE_NORMAL;
   t->recent_cpu = RECENT_CPU_NORMAL;
   list_push_back (&all_list, &t->allelem);
-  // systemcall
-  t->exit_code = 0;  
   list_init(&t->child_list);
-  sema_init(&t->sema_exit, 0);
-  sema_init(&t->sema_wait, 0);
-  t->load_status = false;
   #ifdef USERPROG
   // file descriptor init
   int i = 0;
   for(; i < 128; i++) t->fd_table[i].valid = false;
+  t->pcb.parent = NULL;
+  t->pcb.waiting = false; 
+  t->pcb.exited = false;
+  t->pcb.orphan = false;
+  t->pcb.exitcode = -1;
+  sema_init(&t->pcb.sema_load, 0);
+  sema_init(&t->pcb.sema_wait, 0);  
   #endif
 }
 
@@ -729,6 +731,27 @@ void increase_recent_cpu(void)
   thr->recent_cpu = add_fp(fp_recent, F);
 }
 
+struct thread* get_thread_by_id(tid_t tid)
+{
+  struct list_elem* e = list_front(&all_list);
+  for(; e != list_end(&all_list); e = list_next(e))
+  {
+    struct thread* t = list_entry(e, struct thread, allelem);
+    if(t->tid == tid) return t;
+  }
+  return NULL;
+}
 
+
+int allocate_fd_id(struct thread* t)
+{
+  int i = 3;
+  for(; i < 128; i++)
+  {
+    if(t->fd_table[i].valid == false) return i;
+  }
+  return -1;
+
+}
 
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);

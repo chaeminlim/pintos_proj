@@ -5,7 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
-
+#include "userprog/process.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -94,7 +94,18 @@ struct file_descriptor
    struct file* file;
    bool valid;
 };
-
+struct process_control_block 
+{
+    tid_t pid;
+    struct list_elem child_elem; 
+    struct thread* parent;
+    bool waiting;    
+    bool exited;     
+    bool orphan;     
+    int exitcode;
+    struct semaphore sema_load;
+    struct semaphore sema_wait;
+};
 
 struct thread
   {
@@ -115,16 +126,13 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     struct list child_list;
-    struct list_elem child_list_elem;
-    struct semaphore sema_wait;
-    struct semaphore sema_exit;
-    struct thread* parent;
-    bool load_status;
-    int exit_code;
+    struct process_control_block pcb;             /* Page directory. */
+    
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
+    uint32_t *pagedir;     
     struct file_descriptor fd_table[128];
+    uint8_t* curr_esp;
 #endif
 
     /* Owned by thread.c. */
@@ -176,5 +184,6 @@ int get_max_priority_ready(void);
 void recalculate_recent_cpu_n_priority(void);
 void calculate_load_avg_mlfqs(void);
 void increase_recent_cpu(void);
-
+struct thread* get_thread_by_id(tid_t);
+int allocate_fd_id(struct thread* t);
 #endif /* threads/thread.h */
