@@ -1,11 +1,13 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
-
+#define USER_STACK_BOTTOM ((void *) 0x08048000)
 #include "threads/thread.h"
 
 void syscall_init (void);
 
-void is_safe_addr(void* ptr_to_check);
+
+void is_safe_addr(const void *vaddr);
+
 
 void syscall_halt(void);
 void syscall_exit(int status);
