@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -55,6 +56,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
+  struct thread *t = thread_current();
   char *file_name = file_name_;
   struct intr_frame if_;
   struct thread* t = thread_current();
@@ -541,6 +543,10 @@ setup_stack (void **esp, const char* cmd_line)
         /*push return address*/
         *esp -= 4;
         * (uint32_t *) *esp = 0x0;
+       
+      
+        //hex_dump( *esp,  *esp, PHYS_BASE -  *esp, true);
+        //printf("\n");
       }
         
       else

@@ -296,3 +296,4 @@ void is_safe_addr(const void *vaddr)
       exit(-1);
     }
 }
+
