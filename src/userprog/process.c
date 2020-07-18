@@ -36,19 +36,18 @@ process_execute (const char *file_name)
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
-
-  exe_name = strtok_r(fn_copy, " ", &save_ptr);
+  strlcpy (fn_copy, file_name, strlen(file_name) + 1);
+  strlcpy (fn_copy + strlen(file_name) + 1, file_name, strlen(file_name) + 1);
+  exe_name = strtok_r(fn_copy + strlen(file_name) + 1, " ", &save_ptr);
   
   /* Create a new thread to execute ;FILE_NAME. */
-  tid = thread_create(exe_name, PRI_DEFAULT, start_process, save_ptr);
+  tid = thread_create(exe_name, PRI_DEFAULT, start_process, fn_copy);
 
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
-  
-  
+  {
+    palloc_free_page (fn_copy);
+  }
   return tid; 
-  // 실행된 프로세스의 tid 를 리턴한다.
 }
 
 /* A thread function that loads a user process and starts it
@@ -58,33 +57,26 @@ start_process (void *file_name_)
 {
   char *file_name = file_name_;
   struct intr_frame if_;
-  bool success;
-  
+  struct thread* t = thread_current();
+
 /* Initialize interrupt frame and load executable. */  
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
-  success = load (file_name, &if_.eip, &if_.esp);
+  t->load_status = load (file_name, &if_.eip, &if_.esp);
   /* If load failed, quit. */
-  struct thread* curr = thread_current();
+  //hex_dump( if_.esp,  if_.esp, PHYS_BASE -  if_.esp, true);
+  sema_up (&t->sema_load); // 부모의 exec을 재개 시킨다
 
-  if (!success) 
+  if (!t->load_status) 
   {
-    curr->load_status = false;
-    sema_up(&curr->parent->sema_load); 
     thread_exit ();
   }
-  else
-  {
-    curr->load_status = true;
-    sema_up(&curr->parent->sema_load);
-  }
-    
   //set_args_in_stack(file_name, &if_.esp);
 
-  palloc_free_page (pg_round_down(file_name));  
+  palloc_free_page (file_name);  
   //set_argument_stack(file_name, )
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -109,11 +101,19 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  return -1;
-}
+  struct thread *child;
+  int exit_status;
+  child = get_child_thread(child_tid);
+  if(child == NULL) return -1;
 
+  sema_down(&child->sema_wait);
+  list_remove (&child->child_list_elem);
+  exit_status = child->exit_code;
+  sema_up (&child->sema_exit);
+  return exit_status;
+}
 /* Free the current process's resources. */
 void
 process_exit (void)
@@ -121,6 +121,15 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  
+  // clear fd
+  #ifdef USERPROG
+  int i = 3;
+  for(; i < 128; i++)
+  {
+    if(cur->fd_table[i].valid) file_close(cur->fd_table[i].file);
+  }
+  #endif
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -455,7 +464,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp, const char* arguments) 
+setup_stack (void **esp, const char* cmd_line) 
 {
   uint8_t *kpage;
   bool success = false;
@@ -469,19 +478,18 @@ setup_stack (void **esp, const char* arguments)
         *esp = PHYS_BASE;
         // setting argument 시작
         uint8_t* temp_head;
-        char* exe_name = thread_current()->name;
         int total_len = 0;
         int argc = 0;
         // 스택 포인터의 주소를 내리면서, 낮은 주소에서 높은 방향으로 문자열을 쌓아야 함.
         
         // argument string 쌓기
         
-        int arg_len = strlen(arguments);
+        int arg_len = strlen(cmd_line);
         
         *esp -= 1;
         *(uint8_t*) (*esp + 1) = '\0';
         *esp -= arg_len;
-        memcpy(*esp, arguments, arg_len);
+        memcpy(*esp, cmd_line, arg_len);
         total_len += (arg_len + 1);
         
         // 띄어쓰기 널 처리
@@ -495,15 +503,6 @@ setup_stack (void **esp, const char* arguments)
             *temp_head = '\0';
           }
         }
-
-        // 실행파일 이름 쌓기
-        int exe_len = strlen(exe_name);
-        *esp -= 1;
-        *(uint8_t*) (*esp) = '\0';
-        *esp -= exe_len;
-        memcpy(*esp, exe_name, exe_len);
-        total_len += (exe_len + 1);
-        
         // alignment 하기
         if(total_len % 4 != 0)
         {

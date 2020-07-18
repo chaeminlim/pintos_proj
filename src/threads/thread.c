@@ -223,7 +223,18 @@ thread_create (const char *name, int priority,
 
 
   /* Yield for preemption. */
-  if (t->curr_priority > thread_get_priority ()) thread_yield ();
+  old_level = intr_disable ();
+  if (!list_empty (&ready_list) 
+      && thread_current ()->curr_priority 
+      < list_entry (list_front (&ready_list), 
+      struct thread, elem)->curr_priority)
+  {
+    intr_set_level (old_level);
+    thread_yield ();
+  }
+  intr_set_level (old_level);
+
+  //if (t->curr_priority > thread_get_priority ()) thread_yield ();
   return tid;             
 }
 
@@ -305,16 +316,29 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
+  struct list_elem *child;
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
   process_exit ();
 #endif
 
+  for (child = list_begin (&thread_current ()->child_list);
+       child != list_end (&thread_current ()->child_list); )
+  {
+    struct thread *t = list_entry (child, struct thread, child_list_elem);
+    child = list_remove (child);
+    sema_up (&t->sema_exit);
+  }
+
+  sema_up (&thread_current ()->sema_wait);
+  sema_down (&thread_current ()->sema_exit);
+
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
+
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
@@ -527,7 +551,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->recent_cpu = RECENT_CPU_NORMAL;
   list_push_back (&all_list, &t->allelem);
   // systemcall
-  t->exit_code = 0;  
+  t->exit_code = -1;
   list_init(&t->child_list);
   sema_init(&t->sema_exit, 0);
   sema_init(&t->sema_wait, 0);
@@ -741,19 +765,18 @@ void increase_recent_cpu(void)
   thr->recent_cpu = add_fp(fp_recent, F);
 }
 
-struct thread* get_child_thread(struct thread* t, tid_t tid)
+struct thread* get_child_thread(tid_t tid)
 {
-  if(t == NULL) return NULL;
-  if(list_empty(&t->child_list)) return NULL;
-  else
-  {
-    struct list_elem* e = list_front(&t->child_list);
-    for(; e != list_end(&t->child_list); e = list_next(e))
+  struct list_elem *e;
+  for (e = list_begin (&thread_current ()->child_list);
+       e != list_end (&thread_current ()->child_list);
+       e = list_next (e))
     {
-      if(list_entry(e, struct thread, child_list_elem)->tid == tid)
-      { return list_entry(e, struct thread, child_list_elem); }
+      struct thread *t = list_entry (e, struct thread, child_list_elem);
+      if (t->tid == tid)
+        return t;
     }
-  }
+  // 찾지 못했습니다.
   return NULL;
 }
 

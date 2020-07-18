@@ -2,23 +2,23 @@
 #define USERPROG_SYSCALL_H
 
 #include "threads/thread.h"
-
+#define USER_STACK_BOTTOM 0x08048000UL
 void syscall_init (void);
 
-void is_safe_addr(void* ptr_to_check);
+void is_safe_addr(const void*);
 
-void syscall_halt(void);
-void syscall_exit(int status);
-tid_t syscall_exec(const char* cmd_line);
-int syscall_wait(tid_t pid);
-bool syscall_create(const char* file, unsigned intial_size);
-bool syscall_remove(const char* file);
-int syscall_open(char* file);
-int syscall_filesize(int fd);
-int syscall_read(int fd, void* buffer, unsigned size);
-int syscall_write(int fd, const void* buffer, unsigned size);
-void syscall_seek(int fd, unsigned position);
-unsigned syscall_tell(int fd);
-void syscall_close(int fd);
+void halt(void);
+void exit(int status);
+tid_t exec(const char* cmd_line);
+int wait(tid_t);
+bool create(const char* file, unsigned intial_size);
+bool remove(const char* file);
+int open(char* file);
+int filesize(int fd);
+int read(int fd, void* buffer, unsigned size);
+int write(int fd, const void* buffer, unsigned size);
+void seek(int fd, unsigned position);
+unsigned tell(int fd);
+void close(int fd);
 
 #endif /* userprog/syscall.h */
