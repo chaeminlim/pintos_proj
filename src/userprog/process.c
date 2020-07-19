@@ -15,6 +15,7 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
@@ -130,8 +131,8 @@ process_exit (void)
   {
     if(cur->fd_table[i] != NULL) file_close(cur->fd_table[i]);
   }
-  palloc_free_page (cur->fd_table);
-  
+  //palloc_free_page (cur->fd_table);
+  free(cur->fd_table);
   #ifdef USERPROG
   
   file_close(cur->executing_file);

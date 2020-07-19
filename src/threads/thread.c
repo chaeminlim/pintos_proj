@@ -8,6 +8,7 @@
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
@@ -192,7 +193,9 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-  t->fd_table = palloc_get_multiple (PAL_ZERO, 2);
+  //t->fd_table = palloc_get_page (PAL_ZERO);
+  t->fd_table = malloc ( sizeof(struct file*)*128);
+  
   if (t->fd_table == NULL)
   {
     palloc_free_page (t);
