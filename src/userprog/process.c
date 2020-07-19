@@ -19,6 +19,7 @@
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
 
+extern struct lock file_lock;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -123,13 +124,18 @@ process_exit (void)
 
   
   // clear fd
-  #ifdef USERPROG
   int i = 3;
   for(; i < 128; i++)
   {
-    if(cur->fd_table[i].valid) file_close(cur->fd_table[i].file);
+    close(i);
   }
+  #ifdef USERPROG
+  
+  file_close(cur->executing_file);
   #endif
+
+  
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -257,16 +263,21 @@ load (const char *file_name, void (**eip) (void), void **esp)
   }
   process_activate (); 
 
+  lock_acquire (&file_lock);
   /* Open executable file. */
   file = filesys_open (t->name);
   
   if (file == NULL) 
-    {
-      printf ("load: %s: open failed\n", file_name);
+  {
+    lock_release (&file_lock);
+    printf ("load: %s: open failed\n", file_name);
+    goto done; 
+  }
 
-      goto done; 
-    }
-
+  t->executing_file = file;
+  file_deny_write (t->executing_file);
+  lock_release (&file_lock);
+  
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -349,7 +360,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  //file_close (file);
   return success;
 }
 

@@ -207,6 +207,7 @@ unsigned tell(int fd)
 
 void close(int fd)
 {
+  
   struct thread* t = thread_current();
   if(t->fd_table[fd].valid == false) return;
   file_close(t->fd_table[fd].file);
@@ -219,20 +220,19 @@ int open(char *file)
   is_safe_addr((const uint8_t*)file);
   struct file* opened_file = NULL;
   int fd_num;
-  struct thread* curr = thread_current();
-
+  lock_acquire (&file_lock);
   opened_file = filesys_open(file);
+  lock_release (&file_lock);
   if(opened_file == NULL)
   {
     return -1;
   }
   else
   {
-    fd_num = allocate_fd_id(curr);
+    fd_num = allocate_fd_id(thread_current());
     if(fd_num == -1) return -1;
-    
-    curr->fd_table[fd_num].file = opened_file;
-    curr->fd_table[fd_num].valid = true;
+    thread_current()->fd_table[fd_num].valid = true;
+    thread_current()->fd_table[fd_num].file = opened_file;
     return fd_num;
   }
 }
@@ -242,10 +242,11 @@ int read(int fd, void* buffer, unsigned size)
   is_safe_addr((const uint8_t*)buffer);
   struct thread* curr = thread_current();
 
-  if(fd == 1) exit(-1);
-  lock_acquire(&file_lock);
+  //if(fd == 1) exit(-1);
+  
   if(fd == 0) 
   {
+    lock_acquire(&file_lock);
     unsigned int i = 0;
     for(; i < size; i++)
     {
@@ -256,8 +257,9 @@ int read(int fd, void* buffer, unsigned size)
   }
   else
   {
-    if(curr->fd_table[fd].valid == false) return -1;
     
+    if(curr->fd_table[fd].valid == false) return -1;
+    lock_acquire(&file_lock);
     int ret = file_read(curr->fd_table[fd].file, buffer, size);
     lock_release(&file_lock);
     return ret;
@@ -270,10 +272,9 @@ int write(int fd, const void* buffer, unsigned size)
   struct thread* curr = thread_current();
   if(fd == 0) exit(-1);
   
-  lock_acquire(&file_lock);
-
   if(fd == 1)
   {
+    lock_acquire(&file_lock);
     putbuf((char*)buffer, size);
     lock_release(&file_lock);
     return size;
@@ -281,7 +282,7 @@ int write(int fd, const void* buffer, unsigned size)
   else
   {
     if(curr->fd_table[fd].valid == false) return -1;
-    
+    lock_acquire(&file_lock);
     int ret = file_write(curr->fd_table[fd].file, buffer, size);
     lock_release(&file_lock);
     return ret;

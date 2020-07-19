@@ -329,16 +329,16 @@ thread_exit (void)
     sema_up (&t->sema_exit);
   }
 
-  sema_up (&thread_current ()->sema_wait);
-  sema_down (&thread_current ()->sema_exit);
-
+  sema_up(&thread_current()->sema_wait);
+  sema_down(&thread_current()->sema_exit);
+  
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
+  
   schedule ();
   NOT_REACHED ();
 }
@@ -555,10 +555,11 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->sema_wait, 0);
   sema_init(&t->sema_load, 0);
   t->load_status = false;
-  #ifdef USERPROG
-  // file descriptor init
   int i = 0;
   for(; i < 128; i++) t->fd_table[i].valid = false;
+  t->executing_file = NULL;
+  #ifdef USERPROG
+  // file descriptor init
   
 
   #endif
@@ -777,7 +778,7 @@ int allocate_fd_id(struct thread* t)
     if(t->fd_table[i].valid == false) return i;
   }
   return -1;
-
 }
 
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
