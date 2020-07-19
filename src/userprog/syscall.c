@@ -13,15 +13,31 @@
 #include "devices/input.h"
 
 static void syscall_handler (struct intr_frame *);
-//
+tid_t exec(const char* cmd_line);
+int wait(tid_t);
+bool create(const char* file, unsigned intial_size);
+bool remove(const char* file);
+int open(char* file);
+int filesize(int fd);
+int read(int fd, void* buffer, unsigned size);
+int write(int fd, const void* buffer, unsigned size);
+void seek(int fd, unsigned position);
+unsigned tell(int fd);
+void close(int fd);
 void is_safe_addr(const void *vaddr);
 
 struct lock file_lock;
+struct semaphore writer_sema;
+struct semaphore mutex;
+int reader_count;
 
 void
 syscall_init (void)
 {
   lock_init(&file_lock);
+  sema_init(&writer_sema, 1);
+  sema_init(&mutex, 1);
+  reader_count = 0;
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -59,7 +75,7 @@ syscall_handler (struct intr_frame *f)
       is_safe_addr(f->esp + 4);
       tid_t pid = *(int*)(f->esp + 4);
       int ret = wait(pid);
-      f->eax = (uint32_t) ret;
+      f->eax = ret;
       break;
     }
     case SYS_CREATE:
@@ -240,52 +256,64 @@ int read(int fd, void* buffer, unsigned size)
 {
   is_safe_addr((const uint8_t*)buffer);
   struct thread* curr = thread_current();
-
-  if(fd == 1) return -1;
+  int ret;
+  sema_down(&mutex);
+  reader_count++;
+  if(reader_count == 1) sema_down(&writer_sema);
+  sema_up(&mutex);
   
-  if(fd == 0) 
+  if(fd == 1) ret = -1;
+  else if(fd == 0) 
   {
-    lock_acquire(&file_lock);
     unsigned int i = 0;
     for(; i < size; i++)
     {
       ((char*)buffer)[i] = input_getc();
     }
-    lock_release(&file_lock);
-    return size;
+    ret = size;
   }
   else
   {
     
-    if(curr->fd_table[fd] == NULL) return -1;
-    lock_acquire(&file_lock);
-    int ret = file_read(curr->fd_table[fd], buffer, size);
-    lock_release(&file_lock);
-    return ret;
+    if(curr->fd_table[fd] == NULL) ret = -1;
+    else
+    {
+      int rett = file_read(curr->fd_table[fd], buffer, size);
+      ret = rett;
+    }
   }
+  sema_down(&mutex);
+  reader_count--;
+  if(reader_count == 0) sema_up(&writer_sema);
+  sema_up(&mutex);
+
+  return ret;
 }
 
 int write(int fd, const void* buffer, unsigned size)
 {
   is_safe_addr((const uint8_t*)buffer);
   struct thread* curr = thread_current();
-  if(fd == 0) exit(-1);
-  
-  if(fd == 1)
+  int ret;
+  sema_down(&writer_sema);
+
+  if(fd == 0) ret = -1;
+  else if(fd == 1)
   {
-    lock_acquire(&file_lock);
     putbuf((char*)buffer, size);
-    lock_release(&file_lock);
-    return size;
+    ret = size;
   }
   else
   {
-    if(curr->fd_table[fd] == NULL) return -1;
-    lock_acquire(&file_lock);
-    int ret = file_write(curr->fd_table[fd], buffer, size);
-    lock_release(&file_lock);
-    return ret;
+    if(curr->fd_table[fd] == NULL) ret = -1;
+    else
+    {
+      int rett = file_write(curr->fd_table[fd], buffer, size);
+      ret = rett;
+    }
   }
+  sema_up(&writer_sema);
+  return ret;
 }
 
 void is_safe_addr(const void *vaddr)
