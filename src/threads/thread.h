@@ -134,10 +134,11 @@ struct thread
     struct thread* parent;
     bool load_status;
     int exit_code;
+    struct file_descriptor fd_table[128];
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    struct file_descriptor fd_table[128];
+    
 #endif
 
     /* Owned by thread.c. */

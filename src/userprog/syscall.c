@@ -18,7 +18,6 @@ void is_safe_addr(const void *vaddr);
 
 struct lock file_lock;
 
-
 void
 syscall_init (void)
 {
@@ -221,12 +220,10 @@ int open(char *file)
   struct file* opened_file = NULL;
   int fd_num;
   struct thread* curr = thread_current();
-  lock_acquire(&file_lock);
 
   opened_file = filesys_open(file);
   if(opened_file == NULL)
   {
-    lock_release(&file_lock);
     return -1;
   }
   else
@@ -236,8 +233,6 @@ int open(char *file)
     
     curr->fd_table[fd_num].file = opened_file;
     curr->fd_table[fd_num].valid = true;
-    
-    lock_release(&file_lock);
     return fd_num;
   }
 }
@@ -246,8 +241,10 @@ int read(int fd, void* buffer, unsigned size)
 {
   is_safe_addr((const uint8_t*)buffer);
   struct thread* curr = thread_current();
+
+  if(fd == 1) exit(-1);
   lock_acquire(&file_lock);
-  if(fd == 0)
+  if(fd == 0) 
   {
     unsigned int i = 0;
     for(; i < size; i++)
@@ -271,6 +268,8 @@ int write(int fd, const void* buffer, unsigned size)
 {
   is_safe_addr((const uint8_t*)buffer);
   struct thread* curr = thread_current();
+  if(fd == 0) exit(-1);
+  
   lock_acquire(&file_lock);
 
   if(fd == 1)

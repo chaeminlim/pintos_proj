@@ -193,10 +193,8 @@ thread_create (const char *name, int priority,
   tid = t->tid = allocate_tid ();
 
   // set parent
-  t->pcb.parent = curr;
-  t->pcb.pid = tid;
-  list_push_back(&curr->child_list, &t->pcb.child_elem);
-
+  t->parent = curr;
+  list_push_back(&curr->child_list, &t->child_list_elem);
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
@@ -553,18 +551,15 @@ init_thread (struct thread *t, const char *name, int priority)
   // systemcall
   t->exit_code = -1;
   list_init(&t->child_list);
-
+  sema_init(&t->sema_exit, 0);
+  sema_init(&t->sema_wait, 0);
+  sema_init(&t->sema_load, 0);
+  t->load_status = false;
   #ifdef USERPROG
   // file descriptor init
   int i = 0;
   for(; i < 128; i++) t->fd_table[i].valid = false;
-  t->pcb.parent = NULL;
-  t->pcb.waiting = false; 
-  t->pcb.exited = false;
-  t->pcb.orphan = false;
-  t->pcb.exitcode = -1;
-  sema_init(&t->pcb.sema_load, 0);
-  sema_init(&t->pcb.sema_wait, 0);  
+  
 
   #endif
 }
@@ -772,9 +767,6 @@ struct thread* get_child_thread(tid_t tid)
     }
   // 찾지 못했습니다.
   return NULL;
-}
-
-
 }
 
 int allocate_fd_id(struct thread* t)

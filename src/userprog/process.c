@@ -59,7 +59,6 @@ start_process (void *file_name_)
   struct thread *t = thread_current();
   char *file_name = file_name_;
   struct intr_frame if_;
-  struct thread* t = thread_current();
 
 /* Initialize interrupt frame and load executable. */  
   memset (&if_, 0, sizeof if_);
@@ -76,8 +75,7 @@ start_process (void *file_name_)
   {
     thread_exit ();
   }
-  //set_args_in_stack(file_name, &if_.esp);
-
+  
   palloc_free_page (file_name);  
   //set_argument_stack(file_name, )
   /* Start the user process by simulating a return from an
