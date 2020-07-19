@@ -89,11 +89,7 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
-struct file_descriptor
-{
-   struct file* file;
-   bool valid;
-};
+
 struct process_control_block 
 {
     tid_t pid;
@@ -134,7 +130,7 @@ struct thread
     struct thread* parent;
     bool load_status;
     int exit_code;
-    struct file_descriptor fd_table[128];
+    struct file** fd_table;
     struct file* executing_file;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

@@ -192,6 +192,14 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+  t->fd_table = palloc_get_multiple (PAL_ZERO, 2);
+  if (t->fd_table == NULL)
+  {
+    palloc_free_page (t);
+    return TID_ERROR;
+  }
+  int i = 0;
+  for(; i < 128; i++) t->fd_table[i] = NULL;
   // set parent
   t->parent = curr;
   list_push_back(&curr->child_list, &t->child_list_elem);
@@ -555,8 +563,6 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->sema_wait, 0);
   sema_init(&t->sema_load, 0);
   t->load_status = false;
-  int i = 0;
-  for(; i < 128; i++) t->fd_table[i].valid = false;
   t->executing_file = NULL;
   #ifdef USERPROG
   // file descriptor init
@@ -775,7 +781,7 @@ int allocate_fd_id(struct thread* t)
   int i = 3;
   for(; i < 128; i++)
   {
-    if(t->fd_table[i].valid == false) return i;
+    if(t->fd_table[i] == NULL) return i;
   }
   return -1;
 }

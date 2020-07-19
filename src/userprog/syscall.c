@@ -28,8 +28,9 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  //printf ("system call! number: %d\n", f->esp);
+  
   int syscall_number = *(int*)(f->esp);
+  //printf ("system call! number: %d\n", syscall_number);
   switch(syscall_number)
   {
     case SYS_HALT:
@@ -187,32 +188,31 @@ bool remove(const char* file)
 int filesize(int fd)
 {
   struct thread* t = thread_current();
-  if(t->fd_table[fd].valid == false) return -1;
-  else return file_length(t->fd_table[fd].file);
+  if(t->fd_table[fd] == NULL) return -1;
+  else return file_length(t->fd_table[fd]);
 }
 
 void seek(int fd, unsigned position)
 {
   struct thread* t = thread_current();
-  if(t->fd_table[fd].valid == false) return;
-  else file_seek(t->fd_table[fd].file, position);
+  if(t->fd_table[fd] == NULL) return;
+  else file_seek(t->fd_table[fd], position);
 }
 
 unsigned tell(int fd)
 {
   struct thread* t = thread_current();
-  if(t->fd_table[fd].valid == false) return -1;
-  else return file_tell(t->fd_table[fd].file);
+  if(t->fd_table[fd] == NULL) return -1;
+  else return file_tell(t->fd_table[fd]);
 }
 
 void close(int fd)
 {
   
   struct thread* t = thread_current();
-  if(t->fd_table[fd].valid == false) return;
-  file_close(t->fd_table[fd].file);
-  t->fd_table[fd].valid = false;
-  t->fd_table[fd].file = NULL;
+  if(t->fd_table[fd] == NULL) return;
+  file_close(t->fd_table[fd]);
+  t->fd_table[fd] = NULL;
 }
 // finished
 int open(char *file)
@@ -231,8 +231,7 @@ int open(char *file)
   {
     fd_num = allocate_fd_id(thread_current());
     if(fd_num == -1) return -1;
-    thread_current()->fd_table[fd_num].valid = true;
-    thread_current()->fd_table[fd_num].file = opened_file;
+    thread_current()->fd_table[fd_num] = opened_file;
     return fd_num;
   }
 }
@@ -242,7 +241,7 @@ int read(int fd, void* buffer, unsigned size)
   is_safe_addr((const uint8_t*)buffer);
   struct thread* curr = thread_current();
 
-  //if(fd == 1) exit(-1);
+  if(fd == 1) return -1;
   
   if(fd == 0) 
   {
@@ -258,9 +257,9 @@ int read(int fd, void* buffer, unsigned size)
   else
   {
     
-    if(curr->fd_table[fd].valid == false) return -1;
+    if(curr->fd_table[fd] == NULL) return -1;
     lock_acquire(&file_lock);
-    int ret = file_read(curr->fd_table[fd].file, buffer, size);
+    int ret = file_read(curr->fd_table[fd], buffer, size);
     lock_release(&file_lock);
     return ret;
   }
@@ -281,9 +280,9 @@ int write(int fd, const void* buffer, unsigned size)
   }
   else
   {
-    if(curr->fd_table[fd].valid == false) return -1;
+    if(curr->fd_table[fd] == NULL) return -1;
     lock_acquire(&file_lock);
-    int ret = file_write(curr->fd_table[fd].file, buffer, size);
+    int ret = file_write(curr->fd_table[fd], buffer, size);
     lock_release(&file_lock);
     return ret;
   }

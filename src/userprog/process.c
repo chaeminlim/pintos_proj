@@ -71,13 +71,14 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   //hex_dump( if_.esp,  if_.esp, PHYS_BASE -  if_.esp, true);
   sema_up (&t->sema_load); // 부모의 exec을 재개 시킨다
-
+  palloc_free_page (pg_round_down(file_name));
   if (!t->load_status) 
   {
-    thread_exit ();
+    //thread_exit ();
+    exit(-1);
   }
   
-  palloc_free_page (file_name);  
+    
   //set_argument_stack(file_name, )
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -124,11 +125,13 @@ process_exit (void)
 
   
   // clear fd
-  int i = 3;
+  int i = 0;
   for(; i < 128; i++)
   {
-    close(i);
+    if(cur->fd_table[i] != NULL) file_close(cur->fd_table[i]);
   }
+  palloc_free_page (cur->fd_table);
+  
   #ifdef USERPROG
   
   file_close(cur->executing_file);
@@ -553,9 +556,6 @@ setup_stack (void **esp, const char* cmd_line)
         *esp -= 4;
         * (uint32_t *) *esp = 0x0;
        
-      
-        //hex_dump( *esp,  *esp, PHYS_BASE -  *esp, true);
-        //printf("\n");
       }
         
       else
