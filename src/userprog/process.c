@@ -19,6 +19,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
+#include "vm/page.h"
 
 extern struct lock file_lock;
 static thread_func start_process NO_RETURN;
@@ -61,6 +62,9 @@ start_process (void *file_name_)
   struct thread *t = thread_current();
   char *file_name = file_name_;
   struct intr_frame if_;
+
+  // vm initialization
+  init_vm(&t->mm_struct.vm_area_hash);
 
 /* Initialize interrupt frame and load executable. */  
   memset (&if_, 0, sizeof if_);
@@ -133,8 +137,10 @@ process_exit (void)
   }
   //palloc_free_page (cur->fd_table);
   //free(cur->fd_table);
+  // clear vm
+  free_vm(&cur->mm_struct);
+
   #ifdef USERPROG
-  
   file_close(cur->executing_file);
   #endif
 
@@ -439,35 +445,54 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  // 파일 오프셋을 옮김
   file_seek (file, ofs);
+  // readbytes가 0이하거나 zero_bytes가 0 이하면 에러
+  // read + zero = > 페이지 크기
+  // 현재 load_segment는 전체 페이지를 불러옴
+  // demanding으로 수정
+  int iter = 0;
   while (read_bytes > 0 || zero_bytes > 0) 
     {
+      iter++;
       /* Calculate how to fill this page.
          We will read PAGE_READ_BYTES bytes from FILE
          and zero the final PAGE_ZERO_BYTES bytes. */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
-
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
+      /* uint8_t *kpage = palloc_get_page (PAL_USER);
       if (kpage == NULL)
         return false;
 
-      /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
           palloc_free_page (kpage);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
+      // 한 페이지 할당 완료
 
-      /* Add the page to the process's address space. */
+      // Add the page to the process's address space.
+      // 프로세스의 주소 공간에 install함
       if (!install_page (upage, kpage, writable)) 
         {
           palloc_free_page (kpage);
           return false; 
         }
-
+         */
+      // vm codes
+      struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof(struct vm_area_struct));
+      if (vma == NULL) return false;
+      memset (vma, 0, sizeof (struct vm_area_struct));
+      vma->read_bytes = page_read_bytes;
+      vma->zero_bytes = page_zero_bytes;
+      vma->file = file;
+      vma->offset = ofs + (iter-1)*(PGSIZE);
+      vma->vaddr = upage;
+      vma->type = PG_BINARY;
+      vma->read_only = !writable;
+      insert_vma(&thread_current()->mm_struct, vma);
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
@@ -485,11 +510,21 @@ setup_stack (void **esp, const char* cmd_line)
   bool success = false;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success) // install page가 성공했을 때, 여기서 부터 argument passing 적용
       {
+        // vm
+        struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof(struct vm_area_struct));
+        if (vma == NULL) return false;
+        vma->loaded = true;
+        vma->vaddr = (uint8_t*)PHYS_BASE - PGSIZE;
+        vma->type = PG_ANON;
+        vma->read_only = false;
+        insert_vma(&thread_current()->mm_struct, vma);
+        
         *esp = PHYS_BASE;
         // setting argument 시작
         uint8_t* temp_head;
@@ -558,7 +593,6 @@ setup_stack (void **esp, const char* cmd_line)
         * (uint32_t *) *esp = 0x0;
        
       }
-        
       else
         palloc_free_page (kpage);
     }
@@ -583,4 +617,35 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+
+bool allocate_vm_page_mm(struct vm_area_struct* vma)
+{
+   uint8_t *page = palloc_get_page (PAL_USER);
+   if (page == NULL) return false;
+   switch(vma->type)
+   {
+      case PG_BINARY:
+      {
+         file_seek(vma->file, vma->offset);
+         if (file_read (vma->file, page, vma->read_bytes) != vma->read_bytes)
+         {
+            palloc_free_page (page);
+            return false; 
+         }
+         memset (page + vma->read_bytes, 0, vma->zero_bytes);
+         // 한 페이지 할당 완료
+         // Add the page to the process's address space.
+         // 프로세스의 주소 공간에 install함
+         if (!install_page (vma->vaddr, page, !(vma->read_only))) 
+         {
+            palloc_free_page (page);
+            return false; 
+         }
+         return true;
+      }
+      default:
+         return false;
+   }
 }

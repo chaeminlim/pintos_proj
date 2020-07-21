@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "threads/synch.h"
 #include "userprog/process.h"
+#include "vm/page.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -133,6 +134,8 @@ struct thread
     //struct file** fd_table;
     struct file* fd_table[128];
     struct file* executing_file;
+    // vm
+    struct mm_struct mm_struct;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */

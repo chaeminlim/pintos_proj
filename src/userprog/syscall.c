@@ -11,6 +11,8 @@
 #include "threads/palloc.h"
 #include "lib/stdio.h"
 #include "devices/input.h"
+#include "vm/page.h"
+#include <string.h>
 
 static void syscall_handler (struct intr_frame *);
 tid_t exec(const char* cmd_line);
@@ -24,7 +26,8 @@ int write(int fd, const void* buffer, unsigned size);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
-void is_safe_addr(const void *vaddr);
+void is_string_safe(const void* str);
+void is_buffer_safe(void* buffer, unsigned int size);
 
 struct lock file_lock;
 struct semaphore writer_sema;
@@ -83,6 +86,7 @@ syscall_handler (struct intr_frame *f)
       is_safe_addr(f->esp + 4);
       is_safe_addr(f->esp + 8);
       char* file = *(char**)(f->esp + 4);
+      is_string_safe(file);
       unsigned int initial_size = *(unsigned int*)(f->esp + 8);
       f->eax = create(file, initial_size);
       break;
@@ -91,13 +95,17 @@ syscall_handler (struct intr_frame *f)
     {
       is_safe_addr(f->esp + 4);
       char* file = *(char**)(f->esp + 4);
+      is_string_safe(file);
       f->eax = remove(file);
       break;
+
+
     }
     case SYS_OPEN:
     {
       is_safe_addr(f->esp + 4);
       char* file =*(char**)(f->esp + 4);
+      is_string_safe(file);
       f->eax = open(file);
       break;
     }
@@ -110,11 +118,12 @@ syscall_handler (struct intr_frame *f)
     }
     case SYS_READ:
     {
-      is_safe_addr(f->esp + 12);
-      is_safe_addr(f->esp + 8);
-      is_safe_addr(f->esp + 4);
+      is_safe_addr(f->esp + 12); 
+      is_safe_addr(f->esp + 8); 
+      is_safe_addr(f->esp + 4); 
       unsigned int size = *(unsigned int*)(f->esp+12);
       void** buffer = (f->esp+8);
+      is_buffer_safe(buffer, size); 
       int fd = *(int*)(f->esp+4);
       f->eax = read(fd, *buffer, size);
       break;
@@ -126,6 +135,7 @@ syscall_handler (struct intr_frame *f)
       is_safe_addr(f->esp + 4);
       unsigned int size = *(unsigned int*)(f->esp+12);
       void** buffer = (f->esp+8);
+      is_buffer_safe(buffer, size);
       int fd = *(int*)(f->esp+4);
       f->eax = write(fd, *buffer, size);
       break;
@@ -191,13 +201,13 @@ int wait(tid_t tid)
 
 bool create(const char* file, unsigned initial_size)
 {
-  is_safe_addr((const uint8_t*)file);
+  is_safe_addr((void*)file);
   return filesys_create(file, initial_size);
 }
 
 bool remove(const char* file)
 {
-  is_safe_addr((const uint8_t*)file);
+  is_safe_addr((void*)file);
   return filesys_remove(file);
 }
 
@@ -227,15 +237,17 @@ void close(int fd)
   
   struct thread* t = thread_current();
   if(t->fd_table[fd] == NULL) return;
+  lock_acquire (&file_lock);
   file_close(t->fd_table[fd]);
+  lock_release (&file_lock);
   t->fd_table[fd] = NULL;
 }
 // finished
 int open(char *file)
 {
-  is_safe_addr((const uint8_t*)file);
   struct file* opened_file = NULL;
   int fd_num;
+
   lock_acquire (&file_lock);
   opened_file = filesys_open(file);
   lock_release (&file_lock);
@@ -254,9 +266,9 @@ int open(char *file)
 
 int read(int fd, void* buffer, unsigned size)
 {
-  is_safe_addr((const uint8_t*)buffer);
   struct thread* curr = thread_current();
   int ret;
+  
   sema_down(&mutex);
   reader_count++;
   if(reader_count == 1) sema_down(&writer_sema);
@@ -274,7 +286,6 @@ int read(int fd, void* buffer, unsigned size)
   }
   else
   {
-    
     if(curr->fd_table[fd] == NULL) ret = -1;
     else
     {
@@ -286,13 +297,11 @@ int read(int fd, void* buffer, unsigned size)
   reader_count--;
   if(reader_count == 0) sema_up(&writer_sema);
   sema_up(&mutex);
-
   return ret;
 }
 
 int write(int fd, const void* buffer, unsigned size)
 {
-  is_safe_addr((const uint8_t*)buffer);
   struct thread* curr = thread_current();
   int ret;
   sema_down(&writer_sema);
@@ -316,11 +325,57 @@ int write(int fd, const void* buffer, unsigned size)
   return ret;
 }
 
-void is_safe_addr(const void *vaddr)
+void is_safe_addr(uint8_t* vaddr)
 {
-  if (vaddr < (void *)USER_STACK_BOTTOM || !is_user_vaddr(vaddr))
-    {
-      exit(-1);
-    }
+  if ( (unsigned)vaddr < USER_STACK_BOTTOM || !is_user_vaddr((const void*)vaddr))
+  {
+    exit(-1);
+  }
+  
+  struct vm_area_struct* vma 
+    = get_vma_with_vaddr(&thread_current()->mm_struct, vaddr);
+  if(vma == NULL) exit(-1);
 }
 
+void is_buffer_safe(void* buffer, unsigned int size)
+{
+  void* temp_buffer = *(uint8_t**)buffer;
+  is_safe_addr(*(uint8_t**)buffer); 
+  is_safe_addr(*(uint8_t**)buffer + size); 
+  void* vaddr;
+  void* vaddr_last = pg_round_down(*(uint8_t**)buffer + size);
+  struct vm_area_struct* vma;
+
+  while(1)
+  {
+    vaddr = pg_round_down(temp_buffer);
+    vma = get_vma_with_vaddr(
+      &thread_current()->mm_struct, vaddr);
+    if(vma == NULL) exit(-1);
+    if(vma->read_only) exit(-1);
+
+    if(vaddr == vaddr_last) break;
+    else temp_buffer += PGSIZE;
+  }
+}
+
+void is_string_safe(const void* str)
+{
+  size_t size = strlen(str) + 1;
+  void* temp_buffer = (void*)str;
+  is_safe_addr(temp_buffer);
+  is_safe_addr((void*)((unsigned int)temp_buffer + size));
+  void* vaddr;
+  void* vaddr_last = pg_round_down((void*)((unsigned int)temp_buffer + size));
+  struct vm_area_struct* vma;
+
+  while(1)
+  {
+    vaddr = pg_round_down(temp_buffer);
+    vma = get_vma_with_vaddr(
+      &thread_current()->mm_struct, vaddr);
+    if(vma == NULL) exit(-1);
+    if(vaddr == vaddr_last) break;
+    else temp_buffer += PGSIZE;
+  }
+}

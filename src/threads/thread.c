@@ -14,6 +14,7 @@
 #include "threads/vaddr.h"
 #include "threads/fixed_point.h"
 #include "devices/timer.h"
+#include "userprog/syscall.h"
 
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -569,6 +570,7 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->sema_load, 0);
   t->load_status = false;
   t->executing_file = NULL;
+  // vm
   #ifdef USERPROG
   // file descriptor init
   

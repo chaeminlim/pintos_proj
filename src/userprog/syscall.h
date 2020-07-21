@@ -5,7 +5,7 @@
 
 void syscall_init (void);
 
-void is_safe_addr(const void*);
+void is_safe_addr(uint8_t*);
 
 void halt(void);
 void exit(int status);
