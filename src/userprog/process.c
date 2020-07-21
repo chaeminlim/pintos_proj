@@ -132,7 +132,7 @@ process_exit (void)
     if(cur->fd_table[i] != NULL) file_close(cur->fd_table[i]);
   }
   //palloc_free_page (cur->fd_table);
-  free(cur->fd_table);
+  //free(cur->fd_table);
   #ifdef USERPROG
   
   file_close(cur->executing_file);
