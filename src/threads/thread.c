@@ -195,13 +195,13 @@ thread_create (const char *name, int priority,
   tid = t->tid = allocate_tid ();
 
   //t->fd_table = palloc_get_page (PAL_ZERO);
-  /* t->fd_table = malloc ( sizeof(struct file*)*128);
+  t->fd_table = malloc ( sizeof(struct file*)*128);
   
   if (t->fd_table == NULL)
   {
     palloc_free_page (t);
     return TID_ERROR;
-  } */
+  } 
   int i = 0;
   for(; i < 128; i++) t->fd_table[i] = NULL;
   // set parent
@@ -571,6 +571,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->load_status = false;
   t->executing_file = NULL;
   // vm
+  list_init(&t->mm_struct.mmap_list);
+  t->mm_struct.next_mapid = 0;
   #ifdef USERPROG
   // file descriptor init
   

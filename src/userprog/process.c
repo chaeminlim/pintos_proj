@@ -21,7 +21,7 @@
 #include "userprog/syscall.h"
 #include "vm/page.h"
 
-extern struct lock file_lock;
+extern struct lock filesys_lock;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -136,7 +136,7 @@ process_exit (void)
     if(cur->fd_table[i] != NULL) file_close(cur->fd_table[i]);
   }
   //palloc_free_page (cur->fd_table);
-  //free(cur->fd_table);
+  free(cur->fd_table);
   // clear vm
   free_vm(&cur->mm_struct);
 
@@ -273,20 +273,20 @@ load (const char *file_name, void (**eip) (void), void **esp)
   }
   process_activate (); 
 
-  lock_acquire (&file_lock);
+  lock_acquire (&filesys_lock);
   /* Open executable file. */
   file = filesys_open (t->name);
   
   if (file == NULL) 
   {
-    lock_release (&file_lock);
+    lock_release (&filesys_lock);
     printf ("load: %s: open failed\n", file_name);
     goto done; 
   }
 
   t->executing_file = file;
   file_deny_write (t->executing_file);
-  lock_release (&file_lock);
+  lock_release (&filesys_lock);
   
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -622,10 +622,13 @@ install_page (void *upage, void *kpage, bool writable)
 
 bool allocate_vm_page_mm(struct vm_area_struct* vma)
 {
+  // 유저 페이지 할당
    uint8_t *page = palloc_get_page (PAL_USER);
    if (page == NULL) return false;
+   // vma의 타입에 따라
    switch(vma->type)
    {
+      case PG_FILE:
       case PG_BINARY:
       {
          file_seek(vma->file, vma->offset);
@@ -645,6 +648,7 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
          }
          return true;
       }
+
       default:
          return false;
    }

@@ -131,8 +131,8 @@ struct thread
     struct thread* parent;
     bool load_status;
     int exit_code;
-    //struct file** fd_table;
-    struct file* fd_table[128];
+    struct file** fd_table;
+    //struct file* fd_table[128];
     struct file* executing_file;
     // vm
     struct mm_struct mm_struct;

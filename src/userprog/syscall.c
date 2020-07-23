@@ -9,8 +9,10 @@
 #include "filesys/file.h"
 #include "threads/vaddr.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "lib/stdio.h"
 #include "devices/input.h"
+#include "userprog/pagedir.h"
 #include "vm/page.h"
 #include <string.h>
 
@@ -28,8 +30,10 @@ unsigned tell(int fd);
 void close(int fd);
 void is_string_safe(const void* str);
 void is_buffer_safe(void* buffer, unsigned int size);
+mapid_t mmap(int fd, void *addr);
+void munmap(mapid_t mapping);
 
-struct lock file_lock;
+struct lock filesys_lock;
 struct semaphore writer_sema;
 struct semaphore mutex;
 int reader_count;
@@ -37,7 +41,7 @@ int reader_count;
 void
 syscall_init (void)
 {
-  lock_init(&file_lock);
+  lock_init(&filesys_lock);
   sema_init(&writer_sema, 1);
   sema_init(&mutex, 1);
   reader_count = 0;
@@ -46,8 +50,7 @@ syscall_init (void)
 
 static void
 syscall_handler (struct intr_frame *f)
-{
-  
+{ 
   int syscall_number = *(int*)(f->esp);
   //printf ("system call! number: %d\n", syscall_number);
   switch(syscall_number)
@@ -163,6 +166,24 @@ syscall_handler (struct intr_frame *f)
       close(fd);
       break;
     }
+    case SYS_MMAP:
+    {
+      is_safe_addr(f->esp + 8);
+      is_safe_addr(f->esp + 4);
+      int fd = *(int*)(f->esp+4);
+      void* addr = *(void**)(f->esp + 8);
+      //printf("fd :%d, addr %0x\n", fd, addr);
+      //is_safe_addr(addr);
+      f->eax = mmap(fd, addr);
+      break;
+    }                   /* Map a file into memory. */
+    case SYS_MUNMAP:
+    {
+      is_safe_addr(f->esp + 4);
+      mapid_t mapid = *(mapid_t*)(f->esp+4);
+      munmap(mapid);
+      break;
+    }
     default:
     {
       exit(-1);
@@ -237,9 +258,9 @@ void close(int fd)
   
   struct thread* t = thread_current();
   if(t->fd_table[fd] == NULL) return;
-  lock_acquire (&file_lock);
+  lock_acquire (&filesys_lock);
   file_close(t->fd_table[fd]);
-  lock_release (&file_lock);
+  lock_release (&filesys_lock);
   t->fd_table[fd] = NULL;
 }
 // finished
@@ -248,18 +269,20 @@ int open(char *file)
   struct file* opened_file = NULL;
   int fd_num;
 
-  lock_acquire (&file_lock);
+  lock_acquire (&filesys_lock);
   opened_file = filesys_open(file);
-  lock_release (&file_lock);
+  
   if(opened_file == NULL)
   {
+    lock_release (&filesys_lock);
     return -1;
   }
   else
   {
     fd_num = allocate_fd_id(thread_current());
-    if(fd_num == -1) return -1;
+    if(fd_num == -1) {lock_release (&filesys_lock); return -1;}
     thread_current()->fd_table[fd_num] = opened_file;
+    lock_release (&filesys_lock);
     return fd_num;
   }
 }
@@ -268,7 +291,6 @@ int read(int fd, void* buffer, unsigned size)
 {
   struct thread* curr = thread_current();
   int ret;
-  
   sema_down(&mutex);
   reader_count++;
   if(reader_count == 1) sema_down(&writer_sema);
@@ -377,5 +399,93 @@ void is_string_safe(const void* str)
     if(vma == NULL) exit(-1);
     if(vaddr == vaddr_last) break;
     else temp_buffer += PGSIZE;
+
+  }
+}
+
+// for memory mapped file
+// return -1 if fails
+mapid_t mmap(int fd, void *addr)
+{
+  if (pg_ofs (addr) != 0) return -1;
+  if(fd == 0 || fd == 1) return -1;
+  lock_acquire(&filesys_lock);
+  struct file* target_file = thread_current()->fd_table[fd];
+  if(target_file == NULL) {  lock_release(&filesys_lock); return -1; }
+  struct file* file_reopened = file_reopen(target_file);
+  if(file_reopened == NULL) { lock_release(&filesys_lock); return -1; }
+  else
+  {
+    mapid_t mapid = allocate_mapid();
+    struct mmap_struct* mmap_strt = (struct mmap_struct*)malloc(sizeof(struct mmap_struct)); // need to free
+    mmap_strt->file = file_reopened;
+    mmap_strt->mapid = mapid;
+    list_init(&mmap_strt->vma_list);
+    list_push_back(&thread_current()->mm_struct.mmap_list, &mmap_strt->mmap_elem);
+  
+    off_t file_len = file_length(file_reopened);
+    size_t offset = 0;
+    for(; file_len > 0;)
+    {
+      
+      // 기존에 존재하는 vma라면
+      if(get_vma_with_vaddr(&thread_current()->mm_struct, addr)) { lock_release(&filesys_lock); return -1; }
+      struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof (struct vm_area_struct));
+      memset (vma, 0, sizeof(struct vm_area_struct));
+      vma->type = PG_FILE;
+      vma->read_only = false;
+      vma->vaddr = addr;
+      vma->offset = offset;
+      vma->read_bytes = file_len < PGSIZE ? file_len : PGSIZE;
+      vma->zero_bytes = 0;
+      vma->file = mmap_strt->file;
+      list_push_back(&mmap_strt->vma_list, &vma->mmap_elem);
+      insert_vma(&thread_current()->mm_struct, vma);
+      addr += PGSIZE;
+      offset += PGSIZE;
+      file_len -= PGSIZE;
+    }
+    lock_release(&filesys_lock);
+    return mapid;
+  }
+}
+
+// free mmap_sturct
+void munmap(mapid_t mapping)
+{
+  lock_acquire(&filesys_lock);
+  struct thread* curr = thread_current();
+  struct list* mlist = &curr->mm_struct.mmap_list;
+  if(list_empty(mlist)) { lock_release(&filesys_lock); return; };
+  struct list_elem* e = list_front(mlist);
+  struct mmap_struct* mmapstrt;
+  for(;e != list_end(mlist); e = list_next(e))
+  {
+    mmapstrt = list_entry(e, struct mmap_struct, mmap_elem);
+    if(mmapstrt->mapid == mapping)
+    { // found
+      if(list_empty(&mmapstrt->vma_list)) { lock_release(&filesys_lock); return; };
+      struct list_elem* vma_elem = list_front(&mmapstrt->vma_list);
+      for(; vma_elem != list_end(&mmapstrt->vma_list); vma_elem = list_next(vma_elem))
+      {
+        struct vm_area_struct* vma = list_entry(vma_elem, struct vm_area_struct, mmap_elem);
+
+        bool a = pagedir_is_dirty(curr->pagedir, vma->vaddr);
+
+        if(a)
+        {
+          if(file_write_at(mmapstrt->file, vma->vaddr, vma->read_bytes, vma->offset)!= (long)vma->read_bytes)
+          {  lock_release(&filesys_lock); NOT_REACHED(); }
+          free_vaddr_page(vma->vaddr);
+          // vma vaddr page should be freed.
+        } 
+        free(vma);
+      }
+      file_close(mmapstrt->file);
+      free(mmapstrt);
+      lock_release(&filesys_lock); 
+      
+      break;
+    }
   }
 }
