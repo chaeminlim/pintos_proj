@@ -21,7 +21,7 @@
 #include "userprog/syscall.h"
 #include "vm/page.h"
 
-extern struct lock filesys_lock;
+extern struct semaphore filesys_sema;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -37,7 +37,9 @@ process_execute (const char *file_name)
   char* save_ptr, *exe_name;
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
+  //fn_copy = palloc_get_page (PAL_ZERO);
+  fn_copy = malloc(2*(strlen(file_name) + 1));
+
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, strlen(file_name) + 1);
@@ -76,7 +78,8 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   //hex_dump( if_.esp,  if_.esp, PHYS_BASE -  if_.esp, true);
   sema_up (&t->sema_load); // 부모의 exec을 재개 시킨다
-  palloc_free_page (pg_round_down(file_name));
+  //palloc_free_page (pg_round_down(file_name));
+  free(file_name_ );
   if (!t->load_status) 
   {
     //thread_exit ();
@@ -273,20 +276,20 @@ load (const char *file_name, void (**eip) (void), void **esp)
   }
   process_activate (); 
 
-  lock_acquire (&filesys_lock);
+  sema_down (&filesys_sema);
   /* Open executable file. */
   file = filesys_open (t->name);
   
   if (file == NULL) 
   {
-    lock_release (&filesys_lock);
+    sema_up(&filesys_sema);
     printf ("load: %s: open failed\n", file_name);
     goto done; 
   }
 
   t->executing_file = file;
   file_deny_write (t->executing_file);
-  lock_release (&filesys_lock);
+  sema_up(&filesys_sema);
   
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -451,10 +454,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   // read + zero = > 페이지 크기
   // 현재 load_segment는 전체 페이지를 불러옴
   // demanding으로 수정
-  int iter = 0;
   while (read_bytes > 0 || zero_bytes > 0) 
     {
-      iter++;
       /* Calculate how to fill this page.
          We will read PAGE_READ_BYTES bytes from FILE
          and zero the final PAGE_ZERO_BYTES bytes. */
@@ -488,15 +489,17 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       vma->read_bytes = page_read_bytes;
       vma->zero_bytes = page_zero_bytes;
       vma->file = file;
-      vma->offset = ofs + (iter-1)*(PGSIZE);
+      vma->offset = ofs;
       vma->vaddr = upage;
       vma->type = PG_BINARY;
       vma->read_only = !writable;
+      vma->loaded = false;
       insert_vma(&thread_current()->mm_struct, vma);
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+      ofs += page_read_bytes;
     }
   return true;
 }
@@ -620,36 +623,48 @@ install_page (void *upage, void *kpage, bool writable)
 }
 
 
+bool load_file (void *kaddr, struct vm_area_struct *vma)
+{
+  ASSERT (kaddr != NULL);
+  ASSERT (vma != NULL);
+  ASSERT (vma->type == PG_BINARY || vma->type == PG_FILE);
+
+  if (file_read_at (vma->file, kaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
+    {
+      return false;
+    }
+
+  memset (kaddr + vma->read_bytes, 0, vma->zero_bytes);
+  return true;
+}
+
+
+
 bool allocate_vm_page_mm(struct vm_area_struct* vma)
 {
   // 유저 페이지 할당
-   uint8_t *page = palloc_get_page (PAL_USER);
-   if (page == NULL) return false;
+  
+   void* kpage = palloc_get_page (PAL_USER);
+   if (kpage == NULL) return false;
    // vma의 타입에 따라
    switch(vma->type)
    {
       case PG_FILE:
       case PG_BINARY:
       {
-         file_seek(vma->file, vma->offset);
-         if (file_read (vma->file, page, vma->read_bytes) != vma->read_bytes)
-         {
-            palloc_free_page (page);
-            return false; 
-         }
-         memset (page + vma->read_bytes, 0, vma->zero_bytes);
-         // 한 페이지 할당 완료
-         // Add the page to the process's address space.
-         // 프로세스의 주소 공간에 install함
-         if (!install_page (vma->vaddr, page, !(vma->read_only))) 
-         {
-            palloc_free_page (page);
-            return false; 
-         }
-         return true;
-      }
+        if (!load_file (kpage, vma) ||
+            !install_page (vma->vaddr, kpage, !vma->read_only))
+          {
+            NOT_REACHED ();
+            palloc_free_page (kpage);
+            return false;
+          }
+        vma->loaded = true;
+        return true;
+      } 
 
       default:
          return false;
    }
 }
+

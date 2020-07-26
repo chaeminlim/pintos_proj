@@ -1,3 +1,8 @@
+cd build && make check
+make[1]: Entering directory '/workspace/pintos_v/pintos/src/vm/build'
+gcc -m32 -c ../../vm/page.c -o vm/page.o -g -msoft-float -O -march=i686 -fno-stack-protector -nostdinc -I../.. -I../../lib -I../../lib/kernel -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers -DUSERPROG -DFILESYS -DVM -MMD -MF vm/page.d
+ld -melf_i386 -T threads/kernel.lds.s -o kernel.o threads/start.o threads/init.o threads/thread.o threads/switch.o threads/interrupt.o threads/intr-stubs.o threads/synch.o threads/palloc.o threads/malloc.o threads/fixed_point.o devices/pit.o devices/timer.o devices/kbd.o devices/vga.o devices/serial.o devices/block.o devices/partition.o devices/ide.o devices/input.o devices/intq.o devices/rtc.o devices/shutdown.o devices/speaker.o lib/debug.o lib/random.o lib/stdio.o lib/stdlib.o lib/string.o lib/arithmetic.o lib/ustar.o lib/kernel/debug.o lib/kernel/list.o lib/kernel/bitmap.o lib/kernel/hash.o lib/kernel/console.o userprog/process.o userprog/pagedir.o userprog/exception.o userprog/syscall.o userprog/gdt.o userprog/tss.o filesys/filesys.o filesys/free-map.o filesys/file.o filesys/directory.o filesys/inode.o filesys/fsutil.o vm/page.o
+objcopy -R .note -R .comment -S kernel.o kernel.bin
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/args-none -a args-none --swap-size=4 -- -q  -f run args-none < /dev/null 2> tests/userprog/args-none.errors > tests/userprog/args-none.output
 perl -I../.. ../../tests/userprog/args-none.ck tests/userprog/args-none tests/userprog/args-none.result
 pass tests/userprog/args-none
@@ -327,153 +332,29 @@ perl -I../.. ../../tests/vm/page-shuffle.ck tests/vm/page-shuffle tests/vm/page-
 pass tests/vm/page-shuffle
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-read -a mmap-read -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-read < /dev/null 2> tests/vm/mmap-read.errors > tests/vm/mmap-read.output
 perl -I../.. ../../tests/vm/mmap-read.ck tests/vm/mmap-read tests/vm/mmap-read.result
-FAIL tests/vm/mmap-read
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-read) begin
-  (mmap-read) open "sample.txt"
-  (mmap-read) mmap "sample.txt"
-  (mmap-read) end
-Differences in `diff -u' format:
-  (mmap-read) begin
-  (mmap-read) open "sample.txt"
-  (mmap-read) mmap "sample.txt"
-- (mmap-read) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-read
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-close -a mmap-close -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-close < /dev/null 2> tests/vm/mmap-close.errors > tests/vm/mmap-close.output
 perl -I../.. ../../tests/vm/mmap-close.ck tests/vm/mmap-close tests/vm/mmap-close.result
-FAIL tests/vm/mmap-close
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-close) begin
-  (mmap-close) open "sample.txt"
-  (mmap-close) mmap "sample.txt"
-  (mmap-close) end
-Differences in `diff -u' format:
-  (mmap-close) begin
-  (mmap-close) open "sample.txt"
-  (mmap-close) mmap "sample.txt"
-- (mmap-close) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-close
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-unmap -a mmap-unmap -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-unmap < /dev/null 2> tests/vm/mmap-unmap.errors > tests/vm/mmap-unmap.output
 perl -I../.. ../../tests/vm/mmap-unmap.ck tests/vm/mmap-unmap tests/vm/mmap-unmap.result
 pass tests/vm/mmap-unmap
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-overlap -a mmap-overlap -p tests/vm/zeros -a zeros --swap-size=4 -- -q  -f run mmap-overlap < /dev/null 2> tests/vm/mmap-overlap.errors > tests/vm/mmap-overlap.output
 perl -I../.. ../../tests/vm/mmap-overlap.ck tests/vm/mmap-overlap tests/vm/mmap-overlap.result
-FAIL tests/vm/mmap-overlap
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-overlap) begin
-  (mmap-overlap) open "zeros" once
-  (mmap-overlap) mmap "zeros"
-  (mmap-overlap) open "zeros" again
-  (mmap-overlap) try to mmap "zeros" again
-  (mmap-overlap) end
-Differences in `diff -u' format:
-  (mmap-overlap) begin
-  (mmap-overlap) open "zeros" once
-  (mmap-overlap) mmap "zeros"
-- (mmap-overlap) open "zeros" again
-- (mmap-overlap) try to mmap "zeros" again
-- (mmap-overlap) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-overlap
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-twice -a mmap-twice -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-twice < /dev/null 2> tests/vm/mmap-twice.errors > tests/vm/mmap-twice.output
 perl -I../.. ../../tests/vm/mmap-twice.ck tests/vm/mmap-twice tests/vm/mmap-twice.result
-FAIL tests/vm/mmap-twice
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-twice) begin
-  (mmap-twice) open "sample.txt" #0
-  (mmap-twice) mmap "sample.txt" #0 at 0x10000000
-  (mmap-twice) open "sample.txt" #1
-  (mmap-twice) mmap "sample.txt" #1 at 0x20000000
-  (mmap-twice) compare mmap'd file 0 against data
-  (mmap-twice) compare mmap'd file 1 against data
-  (mmap-twice) end
-Differences in `diff -u' format:
-  (mmap-twice) begin
-  (mmap-twice) open "sample.txt" #0
-  (mmap-twice) mmap "sample.txt" #0 at 0x10000000
-- (mmap-twice) open "sample.txt" #1
-- (mmap-twice) mmap "sample.txt" #1 at 0x20000000
-- (mmap-twice) compare mmap'd file 0 against data
-- (mmap-twice) compare mmap'd file 1 against data
-- (mmap-twice) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-twice
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-write -a mmap-write --swap-size=4 -- -q  -f run mmap-write < /dev/null 2> tests/vm/mmap-write.errors > tests/vm/mmap-write.output
 perl -I../.. ../../tests/vm/mmap-write.ck tests/vm/mmap-write tests/vm/mmap-write.result
-FAIL tests/vm/mmap-write
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-write) begin
-  (mmap-write) create "sample.txt"
-  (mmap-write) open "sample.txt"
-  (mmap-write) mmap "sample.txt"
-  (mmap-write) compare read data against written data
-  (mmap-write) end
-Differences in `diff -u' format:
-  (mmap-write) begin
-  (mmap-write) create "sample.txt"
-  (mmap-write) open "sample.txt"
-  (mmap-write) mmap "sample.txt"
-- (mmap-write) compare read data against written data
-- (mmap-write) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-write
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-exit -a mmap-exit -p tests/vm/child-mm-wrt -a child-mm-wrt --swap-size=4 -- -q  -f run mmap-exit < /dev/null 2> tests/vm/mmap-exit.errors > tests/vm/mmap-exit.output
 perl -I../.. ../../tests/vm/mmap-exit.ck tests/vm/mmap-exit tests/vm/mmap-exit.result
 FAIL tests/vm/mmap-exit
-run: wait for child (should return 0): FAILED
+run: 512 bytes read starting at offset 0 in "sample.txt" differ from expected: FAILED
 pintos -v -k -T 600 --bochs  --filesys-size=2 -p tests/vm/mmap-shuffle -a mmap-shuffle --swap-size=4 -- -q  -f run mmap-shuffle < /dev/null 2> tests/vm/mmap-shuffle.errors > tests/vm/mmap-shuffle.output
 perl -I../.. ../../tests/vm/mmap-shuffle.ck tests/vm/mmap-shuffle tests/vm/mmap-shuffle.result
-FAIL tests/vm/mmap-shuffle
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-shuffle) begin
-  (mmap-shuffle) create "buffer"
-  (mmap-shuffle) open "buffer"
-  (mmap-shuffle) mmap "buffer"
-  (mmap-shuffle) init: cksum=3115322833
-  (mmap-shuffle) shuffle 0: cksum=1691062564
-  (mmap-shuffle) shuffle 1: cksum=1973575879
-  (mmap-shuffle) shuffle 2: cksum=1647619479
-  (mmap-shuffle) shuffle 3: cksum=96566261
-  (mmap-shuffle) shuffle 4: cksum=3885786467
-  (mmap-shuffle) shuffle 5: cksum=3022003332
-  (mmap-shuffle) shuffle 6: cksum=3614934266
-  (mmap-shuffle) shuffle 7: cksum=2704001777
-  (mmap-shuffle) shuffle 8: cksum=735775156
-  (mmap-shuffle) shuffle 9: cksum=1864109763
-  (mmap-shuffle) end
-Differences in `diff -u' format:
-  (mmap-shuffle) begin
-  (mmap-shuffle) create "buffer"
-  (mmap-shuffle) open "buffer"
-  (mmap-shuffle) mmap "buffer"
-- (mmap-shuffle) init: cksum=3115322833
-- (mmap-shuffle) shuffle 0: cksum=1691062564
-- (mmap-shuffle) shuffle 1: cksum=1973575879
-- (mmap-shuffle) shuffle 2: cksum=1647619479
-- (mmap-shuffle) shuffle 3: cksum=96566261
-- (mmap-shuffle) shuffle 4: cksum=3885786467
-- (mmap-shuffle) shuffle 5: cksum=3022003332
-- (mmap-shuffle) shuffle 6: cksum=3614934266
-- (mmap-shuffle) shuffle 7: cksum=2704001777
-- (mmap-shuffle) shuffle 8: cksum=735775156
-- (mmap-shuffle) shuffle 9: cksum=1864109763
-- (mmap-shuffle) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-shuffle
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-bad-fd -a mmap-bad-fd --swap-size=4 -- -q  -f run mmap-bad-fd < /dev/null 2> tests/vm/mmap-bad-fd.errors > tests/vm/mmap-bad-fd.output
 perl -I../.. ../../tests/vm/mmap-bad-fd.ck tests/vm/mmap-bad-fd tests/vm/mmap-bad-fd.result
 pass tests/vm/mmap-bad-fd
@@ -496,7 +377,7 @@ Differences in `diff -u' format:
   (mmap-clean) begin
   (mmap-clean) open "sample.txt"
   (mmap-clean) mmap "sample.txt"
-- (mmap-clean) write "sample.txt"
+  (mmap-clean) write "sample.txt"
 - (mmap-clean) munmap "sample.txt"
 - (mmap-clean) seek "sample.txt"
 - (mmap-clean) read "sample.txt"
@@ -506,140 +387,26 @@ Differences in `diff -u' format:
 (Process exit codes are excluded for matching purposes.)
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-inherit -a mmap-inherit -p ../../tests/vm/sample.txt -a sample.txt -p tests/vm/child-inherit -a child-inherit --swap-size=4 -- -q  -f run mmap-inherit < /dev/null 2> tests/vm/mmap-inherit.errors > tests/vm/mmap-inherit.output
 perl -I../.. ../../tests/vm/mmap-inherit.ck tests/vm/mmap-inherit tests/vm/mmap-inherit.result
-FAIL tests/vm/mmap-inherit
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-inherit) begin
-  (mmap-inherit) open "sample.txt"
-  (mmap-inherit) mmap "sample.txt"
-  (mmap-inherit) exec "child-inherit"
-  (child-inherit) begin
-  child-inherit: exit(-1)
-  (mmap-inherit) checking that mmap'd file still has same data
-  (mmap-inherit) end
-  mmap-inherit: exit(0)
-Differences in `diff -u' format:
-  (mmap-inherit) begin
-  (mmap-inherit) open "sample.txt"
-  (mmap-inherit) mmap "sample.txt"
-- (mmap-inherit) exec "child-inherit"
-- (child-inherit) begin
-- child-inherit: exit(-1)
-- (mmap-inherit) checking that mmap'd file still has same data
-- (mmap-inherit) end
-- mmap-inherit: exit(0)
-+ mmap-inherit: exit(-1)
-
-(User fault messages are excluded for matching purposes.)
+pass tests/vm/mmap-inherit
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-misalign -a mmap-misalign -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-misalign < /dev/null 2> tests/vm/mmap-misalign.errors > tests/vm/mmap-misalign.output
 perl -I../.. ../../tests/vm/mmap-misalign.ck tests/vm/mmap-misalign tests/vm/mmap-misalign.result
-FAIL tests/vm/mmap-misalign
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-misalign) begin
-  (mmap-misalign) open "sample.txt"
-  (mmap-misalign) try to mmap at misaligned address
-  (mmap-misalign) end
-Differences in `diff -u' format:
-  (mmap-misalign) begin
-  (mmap-misalign) open "sample.txt"
-  (mmap-misalign) try to mmap at misaligned address
-- (mmap-misalign) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-misalign
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-null -a mmap-null -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-null < /dev/null 2> tests/vm/mmap-null.errors > tests/vm/mmap-null.output
 perl -I../.. ../../tests/vm/mmap-null.ck tests/vm/mmap-null tests/vm/mmap-null.result
 FAIL tests/vm/mmap-null
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-null) begin
-  (mmap-null) open "sample.txt"
-  (mmap-null) try to mmap at address 0
-  (mmap-null) end
-Differences in `diff -u' format:
-  (mmap-null) begin
-  (mmap-null) open "sample.txt"
-  (mmap-null) try to mmap at address 0
-- (mmap-null) end
-
-(Process exit codes are excluded for matching purposes.)
+run: try to mmap at address 0: FAILED
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-over-code -a mmap-over-code -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-over-code < /dev/null 2> tests/vm/mmap-over-code.errors > tests/vm/mmap-over-code.output
 perl -I../.. ../../tests/vm/mmap-over-code.ck tests/vm/mmap-over-code tests/vm/mmap-over-code.result
-FAIL tests/vm/mmap-over-code
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-over-code) begin
-  (mmap-over-code) open "sample.txt"
-  (mmap-over-code) try to mmap over code segment
-  (mmap-over-code) end
-Differences in `diff -u' format:
-  (mmap-over-code) begin
-  (mmap-over-code) open "sample.txt"
-  (mmap-over-code) try to mmap over code segment
-- (mmap-over-code) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-over-code
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-over-data -a mmap-over-data -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-over-data < /dev/null 2> tests/vm/mmap-over-data.errors > tests/vm/mmap-over-data.output
 perl -I../.. ../../tests/vm/mmap-over-data.ck tests/vm/mmap-over-data tests/vm/mmap-over-data.result
-FAIL tests/vm/mmap-over-data
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-over-data) begin
-  (mmap-over-data) open "sample.txt"
-  (mmap-over-data) try to mmap over data segment
-  (mmap-over-data) end
-Differences in `diff -u' format:
-  (mmap-over-data) begin
-  (mmap-over-data) open "sample.txt"
-  (mmap-over-data) try to mmap over data segment
-- (mmap-over-data) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-over-data
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-over-stk -a mmap-over-stk -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-over-stk < /dev/null 2> tests/vm/mmap-over-stk.errors > tests/vm/mmap-over-stk.output
 perl -I../.. ../../tests/vm/mmap-over-stk.ck tests/vm/mmap-over-stk tests/vm/mmap-over-stk.result
-FAIL tests/vm/mmap-over-stk
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-over-stk) begin
-  (mmap-over-stk) open "sample.txt"
-  (mmap-over-stk) try to mmap over stack segment
-  (mmap-over-stk) end
-Differences in `diff -u' format:
-  (mmap-over-stk) begin
-  (mmap-over-stk) open "sample.txt"
-  (mmap-over-stk) try to mmap over stack segment
-- (mmap-over-stk) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-over-stk
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-remove -a mmap-remove -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-remove < /dev/null 2> tests/vm/mmap-remove.errors > tests/vm/mmap-remove.output
 perl -I../.. ../../tests/vm/mmap-remove.ck tests/vm/mmap-remove tests/vm/mmap-remove.result
-FAIL tests/vm/mmap-remove
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-remove) begin
-  (mmap-remove) open "sample.txt"
-  (mmap-remove) mmap "sample.txt"
-  (mmap-remove) remove "sample.txt"
-  (mmap-remove) try to open "sample.txt"
-  (mmap-remove) create "another"
-  (mmap-remove) end
-Differences in `diff -u' format:
-  (mmap-remove) begin
-  (mmap-remove) open "sample.txt"
-  (mmap-remove) mmap "sample.txt"
-- (mmap-remove) remove "sample.txt"
-- (mmap-remove) try to open "sample.txt"
-- (mmap-remove) create "another"
-- (mmap-remove) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-remove
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-zero -a mmap-zero --swap-size=4 -- -q  -f run mmap-zero < /dev/null 2> tests/vm/mmap-zero.errors > tests/vm/mmap-zero.output
 perl -I../.. ../../tests/vm/mmap-zero.ck tests/vm/mmap-zero tests/vm/mmap-zero.result
 pass tests/vm/mmap-zero
@@ -764,23 +531,23 @@ FAIL tests/vm/page-merge-par
 FAIL tests/vm/page-merge-stk
 FAIL tests/vm/page-merge-mm
 pass tests/vm/page-shuffle
-FAIL tests/vm/mmap-read
-FAIL tests/vm/mmap-close
+pass tests/vm/mmap-read
+pass tests/vm/mmap-close
 pass tests/vm/mmap-unmap
-FAIL tests/vm/mmap-overlap
-FAIL tests/vm/mmap-twice
-FAIL tests/vm/mmap-write
+pass tests/vm/mmap-overlap
+pass tests/vm/mmap-twice
+pass tests/vm/mmap-write
 FAIL tests/vm/mmap-exit
-FAIL tests/vm/mmap-shuffle
+pass tests/vm/mmap-shuffle
 pass tests/vm/mmap-bad-fd
 FAIL tests/vm/mmap-clean
-FAIL tests/vm/mmap-inherit
-FAIL tests/vm/mmap-misalign
+pass tests/vm/mmap-inherit
+pass tests/vm/mmap-misalign
 FAIL tests/vm/mmap-null
-FAIL tests/vm/mmap-over-code
-FAIL tests/vm/mmap-over-data
-FAIL tests/vm/mmap-over-stk
-FAIL tests/vm/mmap-remove
+pass tests/vm/mmap-over-code
+pass tests/vm/mmap-over-data
+pass tests/vm/mmap-over-stk
+pass tests/vm/mmap-remove
 pass tests/vm/mmap-zero
 pass tests/filesys/base/lg-create
 pass tests/filesys/base/lg-full
@@ -795,5 +562,7 @@ pass tests/filesys/base/sm-seq-random
 pass tests/filesys/base/syn-read
 pass tests/filesys/base/syn-remove
 pass tests/filesys/base/syn-write
-25 of 113 tests failed.
+13 of 113 tests failed.
 ../../tests/Make.tests:26: recipe for target 'check' failed
+make[1]: Leaving directory '/workspace/pintos_v/pintos/src/vm/build'
+../Makefile.kernel:10: recipe for target 'check' failed

@@ -11,5 +11,5 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (void);
 bool allocate_vm_page_mm(struct vm_area_struct* vma);
-
+bool load_file (void *kaddr, struct vm_area_struct *vma);
 #endif /* userprog/process.h */

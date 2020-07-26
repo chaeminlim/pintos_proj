@@ -12,6 +12,22 @@
 unsigned int vm_hash_func(const struct hash_elem* e, void* aux);
 bool vm_func_less (const struct hash_elem* e1,const struct hash_elem* e2, void* aux);
 
+struct mmap_struct* find_mmap_struct(mapid_t mapping)
+{
+    struct list_elem *e;
+    for (e = list_begin (&thread_current ()->mm_struct.mmap_list);
+        e != list_end (&thread_current ()->mm_struct.mmap_list);
+        e = list_next (e))
+        {
+        struct mmap_struct *f = list_entry (e, struct mmap_struct, mmap_elem);
+        // 같은 것을 찾았으면 바로 반환합니다.
+        if (f->mapid == mapping)
+            return f;
+        }
+  // 찾지 못했습니다.
+  return NULL; 
+}
+
 unsigned vm_hash_func(const struct hash_elem* e, void* aux)
 {
     struct vm_area_struct* vma =  hash_entry(e, struct vm_area_struct, elem);
@@ -38,8 +54,10 @@ bool insert_vma(struct mm_struct* mm_struct, struct vm_area_struct* vma)
 
 bool delete_vma(struct mm_struct* mm_struct, struct vm_area_struct* vma)
 {
-    if(hash_delete(&mm_struct->vm_area_hash, &vma->elem) != NULL) return true;
-    else return false;
+    if(!hash_delete(&mm_struct->vm_area_hash, &vma->elem)) return false;
+    free_vaddr_page(vma->vaddr);
+    free(vma);
+    return true;
 }
 
 // if fail return NULL
@@ -56,16 +74,17 @@ struct vm_area_struct* get_vma_with_vaddr(struct mm_struct* mm_struct, void* vad
 
 void free_vma(struct hash_elem* e, void* aux)
 {
+    ASSERT (e != NULL);
     struct vm_area_struct* vma = hash_entry(e, struct vm_area_struct, elem);
     free_vaddr_page(vma->vaddr);
     free(vma);
 }
 
+
 void free_vaddr_page(void* vaddr)
 {
-    
-    void* addr = pagedir_get_page(thread_current()->pagedir, pg_round_down(vaddr));
-    //palloc_free_page();
+     pagedir_clear_page (thread_current()->pagedir, vaddr);
+    palloc_free_page (pagedir_get_page(thread_current()->pagedir, vaddr));
 }
 
 void free_vm(struct mm_struct* mm)
@@ -77,3 +96,4 @@ mapid_t allocate_mapid()
 {
     return thread_current()->mm_struct.next_mapid++;
 }
+

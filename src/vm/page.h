@@ -54,4 +54,7 @@ void free_vma(struct hash_elem* e, void* aux);
 struct vm_area_struct* get_vma_with_vaddr(struct mm_struct* mm_struct, void* vaddr);
 mapid_t allocate_mapid(void);
 void free_vaddr_page(void* vaddr);
+struct mmap_struct* find_mmap_struct(mapid_t mapping);
+
+
 #endif

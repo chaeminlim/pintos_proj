@@ -28,12 +28,12 @@ int write(int fd, const void* buffer, unsigned size);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
-void is_string_safe(const void* str);
-void is_buffer_safe(void* buffer, unsigned int size);
+void is_string_safe(char* str);
+void is_buffer_safe(void* buffer, unsigned int size);  
 mapid_t mmap(int fd, void *addr);
 void munmap(mapid_t mapping);
 
-struct lock filesys_lock;
+struct semaphore filesys_sema;
 struct semaphore writer_sema;
 struct semaphore mutex;
 int reader_count;
@@ -41,7 +41,7 @@ int reader_count;
 void
 syscall_init (void)
 {
-  lock_init(&filesys_lock);
+  sema_init(&filesys_sema, 1);
   sema_init(&writer_sema, 1);
   sema_init(&mutex, 1);
   reader_count = 0;
@@ -71,9 +71,9 @@ syscall_handler (struct intr_frame *f)
     case SYS_EXEC:
     {
       is_safe_addr(f->esp + 4);
-      char* cmd_line = *(char**)(f->esp + 4);
-      int return_code = exec(cmd_line);
-      f->eax = (uint32_t) return_code;
+      char* cmd_line = (char*)*((int*)f->esp + 1);
+      uint32_t return_code = exec(cmd_line);
+      f->eax = return_code;
       break;
     }
     case SYS_WAIT:
@@ -88,7 +88,7 @@ syscall_handler (struct intr_frame *f)
     {
       is_safe_addr(f->esp + 4);
       is_safe_addr(f->esp + 8);
-      char* file = *(char**)(f->esp + 4);
+      char* file = (char*)*((int*)f->esp + 1);
       is_string_safe(file);
       unsigned int initial_size = *(unsigned int*)(f->esp + 8);
       f->eax = create(file, initial_size);
@@ -97,7 +97,7 @@ syscall_handler (struct intr_frame *f)
     case SYS_REMOVE:
     {
       is_safe_addr(f->esp + 4);
-      char* file = *(char**)(f->esp + 4);
+      char* file = (char*)*((int*)f->esp + 1);
       is_string_safe(file);
       f->eax = remove(file);
       break;
@@ -107,7 +107,7 @@ syscall_handler (struct intr_frame *f)
     case SYS_OPEN:
     {
       is_safe_addr(f->esp + 4);
-      char* file =*(char**)(f->esp + 4);
+      char* file = (char*)*((int*)f->esp + 1);
       is_string_safe(file);
       f->eax = open(file);
       break;
@@ -125,10 +125,10 @@ syscall_handler (struct intr_frame *f)
       is_safe_addr(f->esp + 8); 
       is_safe_addr(f->esp + 4); 
       unsigned int size = *(unsigned int*)(f->esp+12);
-      void** buffer = (f->esp+8);
+      void* buffer = (void*)*((int*)f->esp + 2);
       is_buffer_safe(buffer, size); 
       int fd = *(int*)(f->esp+4);
-      f->eax = read(fd, *buffer, size);
+      f->eax = read(fd, buffer, size);
       break;
     }
     case SYS_WRITE:
@@ -137,10 +137,10 @@ syscall_handler (struct intr_frame *f)
       is_safe_addr(f->esp + 8);
       is_safe_addr(f->esp + 4);
       unsigned int size = *(unsigned int*)(f->esp+12);
-      void** buffer = (f->esp+8);
+      void* buffer = (void*)*((int*)f->esp + 2);
       is_buffer_safe(buffer, size);
       int fd = *(int*)(f->esp+4);
-      f->eax = write(fd, *buffer, size);
+      f->eax = write(fd, buffer, size);
       break;
     }
     case SYS_SEEK:
@@ -171,9 +171,7 @@ syscall_handler (struct intr_frame *f)
       is_safe_addr(f->esp + 8);
       is_safe_addr(f->esp + 4);
       int fd = *(int*)(f->esp+4);
-      void* addr = *(void**)(f->esp + 8);
-      //printf("fd :%d, addr %0x\n", fd, addr);
-      //is_safe_addr(addr);
+      void* addr = (void*)*((int*)f->esp + 2);
       f->eax = mmap(fd, addr);
       break;
     }                   /* Map a file into memory. */
@@ -222,13 +220,12 @@ int wait(tid_t tid)
 
 bool create(const char* file, unsigned initial_size)
 {
-  is_safe_addr((void*)file);
+
   return filesys_create(file, initial_size);
 }
 
 bool remove(const char* file)
 {
-  is_safe_addr((void*)file);
   return filesys_remove(file);
 }
 
@@ -258,9 +255,9 @@ void close(int fd)
   
   struct thread* t = thread_current();
   if(t->fd_table[fd] == NULL) return;
-  lock_acquire (&filesys_lock);
+  sema_down (&filesys_sema);
   file_close(t->fd_table[fd]);
-  lock_release (&filesys_lock);
+  sema_up (&filesys_sema);
   t->fd_table[fd] = NULL;
 }
 // finished
@@ -269,20 +266,20 @@ int open(char *file)
   struct file* opened_file = NULL;
   int fd_num;
 
-  lock_acquire (&filesys_lock);
+  sema_down (&filesys_sema);
   opened_file = filesys_open(file);
   
   if(opened_file == NULL)
   {
-    lock_release (&filesys_lock);
+    sema_up (&filesys_sema);
     return -1;
   }
   else
   {
     fd_num = allocate_fd_id(thread_current());
-    if(fd_num == -1) {lock_release (&filesys_lock); return -1;}
+    if(fd_num == -1) {sema_up (&filesys_sema); return -1;}
     thread_current()->fd_table[fd_num] = opened_file;
-    lock_release (&filesys_lock);
+    sema_up (&filesys_sema);
     return fd_num;
   }
 }
@@ -295,7 +292,7 @@ int read(int fd, void* buffer, unsigned size)
   reader_count++;
   if(reader_count == 1) sema_down(&writer_sema);
   sema_up(&mutex);
-  
+  sema_down(&filesys_sema);
   if(fd == 1) ret = -1;
   else if(fd == 0) 
   {
@@ -315,6 +312,7 @@ int read(int fd, void* buffer, unsigned size)
       ret = rett;
     }
   }
+  sema_up(&filesys_sema);
   sema_down(&mutex);
   reader_count--;
   if(reader_count == 0) sema_up(&writer_sema);
@@ -326,8 +324,10 @@ int write(int fd, const void* buffer, unsigned size)
 {
   struct thread* curr = thread_current();
   int ret;
+  //printf("try lock acquire ! %d\n", curr->tid);
   sema_down(&writer_sema);
-
+  sema_down(&filesys_sema);
+  //printf("lock acquire ! %d\n", curr->tid);
   if(fd == 0) ret = -1;
   else if(fd == 1)
   {
@@ -343,50 +343,46 @@ int write(int fd, const void* buffer, unsigned size)
       ret = rett;
     }
   }
+  //printf("lock release ! %d\n", curr->tid);
+  sema_up(&filesys_sema);
   sema_up(&writer_sema);
   return ret;
 }
 
-void is_safe_addr(uint8_t* vaddr)
+void is_safe_addr(void* vaddr)
 {
-  if ( (unsigned)vaddr < USER_STACK_BOTTOM || !is_user_vaddr((const void*)vaddr))
+  if ((unsigned)vaddr < USER_STACK_BOTTOM || !is_user_vaddr((const void*)vaddr))
   {
     exit(-1);
   }
-  
-  struct vm_area_struct* vma 
-    = get_vma_with_vaddr(&thread_current()->mm_struct, vaddr);
-  if(vma == NULL) exit(-1);
 }
 
-void is_buffer_safe(void* buffer, unsigned int size)
+void is_buffer_safe(void* buffer, unsigned size)
 {
-  void* temp_buffer = *(uint8_t**)buffer;
-  is_safe_addr(*(uint8_t**)buffer); 
-  is_safe_addr(*(uint8_t**)buffer + size); 
+  void* temp_buffer = buffer;
+  is_safe_addr(buffer); 
+  is_safe_addr((void*)((unsigned)buffer + size)); 
   void* vaddr;
-  void* vaddr_last = pg_round_down(*(uint8_t**)buffer + size);
+  void* vaddr_last = pg_round_down((void*)((unsigned)buffer + size));
   struct vm_area_struct* vma;
 
   while(1)
   {
     vaddr = pg_round_down(temp_buffer);
-    vma = get_vma_with_vaddr(
-      &thread_current()->mm_struct, vaddr);
+    vma = get_vma_with_vaddr(&thread_current()->mm_struct, vaddr);
     if(vma == NULL) exit(-1);
     if(vma->read_only) exit(-1);
-
     if(vaddr == vaddr_last) break;
     else temp_buffer += PGSIZE;
   }
 }
 
-void is_string_safe(const void* str)
+void is_string_safe(char* str)
 {
-  size_t size = strlen(str) + 1;
+  size_t size = strlen((char*)str) + 1;
   void* temp_buffer = (void*)str;
   is_safe_addr(temp_buffer);
-  is_safe_addr((void*)((unsigned int)temp_buffer + size));
+  is_safe_addr((void*)((size_t)temp_buffer + size));
   void* vaddr;
   void* vaddr_last = pg_round_down((void*)((unsigned int)temp_buffer + size));
   struct vm_area_struct* vma;
@@ -399,7 +395,6 @@ void is_string_safe(const void* str)
     if(vma == NULL) exit(-1);
     if(vaddr == vaddr_last) break;
     else temp_buffer += PGSIZE;
-
   }
 }
 
@@ -409,27 +404,32 @@ mapid_t mmap(int fd, void *addr)
 {
   if (pg_ofs (addr) != 0) return -1;
   if(fd == 0 || fd == 1) return -1;
-  lock_acquire(&filesys_lock);
+  // lock
+  sema_down(&filesys_sema);
   struct file* target_file = thread_current()->fd_table[fd];
-  if(target_file == NULL) {  lock_release(&filesys_lock); return -1; }
+  if(target_file == NULL) { sema_up(&filesys_sema);  return -1; }
   struct file* file_reopened = file_reopen(target_file);
-  if(file_reopened == NULL) { lock_release(&filesys_lock); return -1; }
+  if(file_reopened == NULL) { sema_up(&filesys_sema); return -1; }
   else
   {
     mapid_t mapid = allocate_mapid();
+    // alloc mmap struct
     struct mmap_struct* mmap_strt = (struct mmap_struct*)malloc(sizeof(struct mmap_struct)); // need to free
+    // setup
+    if(mmap_strt == NULL) {sema_up(&filesys_sema); return -1; }
     mmap_strt->file = file_reopened;
     mmap_strt->mapid = mapid;
+    // vma-> list 초기화
     list_init(&mmap_strt->vma_list);
+    // mmap list 에 푸시
     list_push_back(&thread_current()->mm_struct.mmap_list, &mmap_strt->mmap_elem);
-  
+    
     off_t file_len = file_length(file_reopened);
     size_t offset = 0;
     for(; file_len > 0;)
     {
-      
       // 기존에 존재하는 vma라면
-      if(get_vma_with_vaddr(&thread_current()->mm_struct, addr)) { lock_release(&filesys_lock); return -1; }
+      if(get_vma_with_vaddr(&thread_current()->mm_struct, addr)) { sema_up(&filesys_sema); return -1; }
       struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof (struct vm_area_struct));
       memset (vma, 0, sizeof(struct vm_area_struct));
       vma->type = PG_FILE;
@@ -437,55 +437,48 @@ mapid_t mmap(int fd, void *addr)
       vma->vaddr = addr;
       vma->offset = offset;
       vma->read_bytes = file_len < PGSIZE ? file_len : PGSIZE;
-      vma->zero_bytes = 0;
+      vma->zero_bytes = PGSIZE - vma->read_bytes;
       vma->file = mmap_strt->file;
+      vma->loaded = false;
       list_push_back(&mmap_strt->vma_list, &vma->mmap_elem);
       insert_vma(&thread_current()->mm_struct, vma);
+      
       addr += PGSIZE;
       offset += PGSIZE;
       file_len -= PGSIZE;
+      
     }
-    lock_release(&filesys_lock);
+    sema_up(&filesys_sema);
     return mapid;
   }
 }
-
 // free mmap_sturct
 void munmap(mapid_t mapping)
 {
-  lock_acquire(&filesys_lock);
-  struct thread* curr = thread_current();
-  struct list* mlist = &curr->mm_struct.mmap_list;
-  if(list_empty(mlist)) { lock_release(&filesys_lock); return; };
-  struct list_elem* e = list_front(mlist);
-  struct mmap_struct* mmapstrt;
-  for(;e != list_end(mlist); e = list_next(e))
-  {
-    mmapstrt = list_entry(e, struct mmap_struct, mmap_elem);
-    if(mmapstrt->mapid == mapping)
-    { // found
-      if(list_empty(&mmapstrt->vma_list)) { lock_release(&filesys_lock); return; };
-      struct list_elem* vma_elem = list_front(&mmapstrt->vma_list);
-      for(; vma_elem != list_end(&mmapstrt->vma_list); vma_elem = list_next(vma_elem))
-      {
-        struct vm_area_struct* vma = list_entry(vma_elem, struct vm_area_struct, mmap_elem);
 
-        bool a = pagedir_is_dirty(curr->pagedir, vma->vaddr);
+  sema_down(&filesys_sema);
+  // find mmap _ struct
+  struct mmap_struct* mmapstrt = find_mmap_struct(mapping);
+  if (!mmapstrt) { sema_up(&filesys_sema); return; }
 
-        if(a)
+  // m unmap !
+  // 찾은 mmap struct의 vma list를 순회하면서, vma가 로드 되어있고  dirty bit이 1 이라면, 파일을 덮어쓰고,  vma->vaddr을 free 하고,
+  // vma -> loaded를 false로 만들고, vma->list에서 제거 후, 해쉬 테이블에서도 제거한다/
+  struct list_elem *e;
+  for (e = list_begin (&mmapstrt->vma_list); e != list_end (&mmapstrt->vma_list); )
+    {
+      struct vm_area_struct* vma = list_entry (e, struct vm_area_struct, mmap_elem);
+      if (vma->loaded && pagedir_is_dirty(thread_current ()->pagedir, vma->vaddr))
         {
-          if(file_write_at(mmapstrt->file, vma->vaddr, vma->read_bytes, vma->offset)!= (long)vma->read_bytes)
-          {  lock_release(&filesys_lock); NOT_REACHED(); }
-          free_vaddr_page(vma->vaddr);
-          // vma vaddr page should be freed.
-        } 
-        free(vma);
-      }
-      file_close(mmapstrt->file);
-      free(mmapstrt);
-      lock_release(&filesys_lock); 
-      
-      break;
+          if (file_write_at (vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
+          {  sema_up(&filesys_sema); NOT_REACHED (); }
+          free_vaddr_page (vma->vaddr);
+        }
+      vma->loaded = false;
+      e = list_remove (e);
+      delete_vma(&thread_current()->mm_struct, vma);
     }
-  }
+  list_remove (&mmapstrt->mmap_elem);
+  free (mmapstrt);
+  sema_up(&filesys_sema);
 }
