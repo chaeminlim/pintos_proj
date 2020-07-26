@@ -8,9 +8,34 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "userprog/pagedir.h"
+#include "lib/string.h"
+#include "vm/swap.h"
+
+extern struct semaphore lru_sema;
 
 unsigned int vm_hash_func(const struct hash_elem* e, void* aux);
 bool vm_func_less (const struct hash_elem* e1,const struct hash_elem* e2, void* aux);
+
+struct page* allocate_page(enum palloc_flags flags, struct vm_area_struct* vma)
+{
+    struct page* page = (struct page*)malloc(sizeof(struct page));
+    if(page == NULL) return NULL;
+    memset (page, 0, sizeof (struct page));
+    page->thread = thread_current();
+    page->vma = vma;
+    page->kaddr = palloc_get_page(flags);
+    if(page->kaddr == NULL)
+    {
+        free(page);
+        return NULL;
+    }
+    sema_down(&lru_sema);
+    add_page_lru(page);
+    sema_up(&lru_sema);
+    return page;
+}
+
+
 
 struct mmap_struct* find_mmap_struct(mapid_t mapping)
 {
@@ -28,13 +53,13 @@ struct mmap_struct* find_mmap_struct(mapid_t mapping)
   return NULL; 
 }
 
-unsigned vm_hash_func(const struct hash_elem* e, void* aux)
+unsigned vm_hash_func(const struct hash_elem* e, void* aux UNUSED)
 {
     struct vm_area_struct* vma =  hash_entry(e, struct vm_area_struct, elem);
     return hash_int((int)vma->vaddr);
 }
 
-bool vm_func_less (const struct hash_elem* e1,const struct hash_elem* e2, void* aux)
+bool vm_func_less (const struct hash_elem* e1,const struct hash_elem* e2, void* aux UNUSED)
 {
     struct vm_area_struct* vma1 =  hash_entry(e1, struct vm_area_struct, elem);
     struct vm_area_struct* vma2 =  hash_entry(e2, struct vm_area_struct, elem);
@@ -72,7 +97,7 @@ struct vm_area_struct* get_vma_with_vaddr(struct mm_struct* mm_struct, void* vad
     return elem ? hash_entry (elem, struct vm_area_struct, elem) : NULL;
 }
 
-void free_vma(struct hash_elem* e, void* aux)
+void destroy_vma(struct hash_elem* e, void* aux UNUSED)
 {
     ASSERT (e != NULL);
     struct vm_area_struct* vma = hash_entry(e, struct vm_area_struct, elem);
@@ -80,16 +105,30 @@ void free_vma(struct hash_elem* e, void* aux)
     free(vma);
 }
 
-
 void free_vaddr_page(void* vaddr)
 {
-     pagedir_clear_page (thread_current()->pagedir, vaddr);
-    palloc_free_page (pagedir_get_page(thread_current()->pagedir, vaddr));
+    free_kaddr_page (pagedir_get_page (thread_current ()->pagedir, vaddr));
+}
+
+void free_kaddr_page(void* kaddr)
+{
+    sema_down(&lru_sema);
+    struct page *page = find_page_from_lru_list(kaddr);
+    if (page)
+    {
+        ASSERT (page->thread->magic == 0xcd6abf4b);
+        ASSERT (page->vma != NULL);
+        pagedir_clear_page (page->thread->pagedir, page->vma->vaddr);
+        delete_page_lru(page);
+        palloc_free_page(page->kaddr);
+        free(page);
+    }
+    sema_up(&lru_sema);
 }
 
 void free_vm(struct mm_struct* mm)
 {
-    hash_destroy(&mm->vm_area_hash, free_vma);
+    hash_destroy(&mm->vm_area_hash, destroy_vma);
 }
 
 mapid_t allocate_mapid()

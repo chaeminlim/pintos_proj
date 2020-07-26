@@ -1,0 +1,168 @@
+#include "vm/swap.h"
+#include "vm/page.h"
+#include "threads/synch.h"
+#include "threads/thread.h"
+#include "userprog/pagedir.h"
+#include "threads/palloc.h"
+#include "threads/vaddr.h"
+
+struct list lru_list;
+struct semaphore lru_sema;
+struct list_elem* lru_clock;
+struct semaphore swap_sema;
+struct bitmap* swap_bitmap;
+extern struct semaphore filesys_sema;
+
+bool is_curr_hold_lru_lock(void);
+
+
+bool is_curr_hold_lru_lock()
+{
+    if(sema_try_down(&lru_sema))
+    {
+        sema_up(&lru_sema);
+        return false;
+    }
+    else return true;
+}
+
+void init_lru_list(void)
+{
+    list_init(&lru_list);
+    sema_init(&lru_sema, 1);
+    lru_clock = NULL;
+}
+
+void add_page_lru(struct page* page)
+{
+    ASSERT(is_curr_hold_lru_lock());
+    list_push_back(&lru_list, &page->lru_elem);
+}
+
+void delete_page_lru(struct page* page)
+{
+    ASSERT(is_curr_hold_lru_lock());
+
+    if (lru_clock == &page->lru_elem)
+    {
+      lru_clock = list_remove (lru_clock);
+    }
+  else
+    {
+      list_remove (&page->lru_elem);
+    }
+}
+
+struct page* find_page_from_lru_list(void *kaddr)
+{
+    ASSERT(is_curr_hold_lru_lock());
+    ASSERT (pg_ofs(kaddr) == 0);
+
+    struct list_elem *e;
+    for (e = list_begin (&lru_list); e != list_end (&lru_list); e = list_next (e))
+    {
+        struct page *page = list_entry (e, struct page, lru_elem);
+        ASSERT (page);
+        if (page->kaddr == kaddr) return page;
+    }
+    return NULL;
+}
+
+
+
+
+void swap_pages()
+{/* 
+    struct page *victim = get_victim();
+    ASSERT (victim != NULL);
+    ASSERT (victim->thread != NULL);
+    ASSERT (victim->thread->magic == 0xcd6abf4b);
+    ASSERT (victim->vma != NULL);
+    
+    bool dirty = pagedir_is_dirty (victim->thread->pagedir, victim->vma->vaddr);
+    switch (victim->vma->type)
+        {
+        case PG_BINARY:
+            if (dirty)
+            {
+                //victim->vma->swap_slot = swap_out(victim->paddr);
+                //victim->vma->type = PG_ANON;
+            }
+            break;
+        case PG_FILE:
+            if (dirty)
+            {
+                if (file_write_at (victim->vma->file, victim->vma->vaddr,
+                                victim->vma->read_bytes, victim->vma->offset)
+                != (int) victim->vma->read_bytes)
+                NOT_REACHED ();
+            }
+            break;
+        case PG_ANON:
+            //victim->vma->swap_slot = swap_out(victim->paddr);
+            break;
+        default:
+            NOT_REACHED ();
+        }
+    victim->vma->loaded = false;
+    free_page(victim->paddr); */
+}
+
+struct list_elem * get_next_lru_clock (void)
+{/* 
+    ASSERT(is_curr_hold_lru_lock());
+    if (lru_clock == NULL || lru_clock == list_end (&lru_list))
+    {
+        if (list_empty (&lru_list)) return NULL;
+        else return (lru_clock = list_begin (&lru_list));
+    }
+    lru_clock = list_next (lru_clock);
+    if (lru_clock == list_end (&lru_list)) return get_next_lru_clock ();
+    return lru_clock; */
+}
+
+struct page* get_victim (void)
+{
+    /* 
+    struct page *page;
+    struct list_elem *e;
+    sema_down(&lru_sema);
+    e = get_next_lru_clock();
+    ASSERT (e != NULL);
+    page = list_entry (e, struct page, lru_elem);
+
+    while (pagedir_is_accessed (page->thread->pagedir, page->vma->vaddr))
+    {
+        pagedir_set_accessed (page->thread->pagedir, page->vma->vaddr, false);
+        e = get_next_lru_clock();
+        ASSERT (e != NULL);
+        page = list_entry (e, struct page, lru_elem);
+        ASSERT (page);
+    }
+    sema_up(&lru_sema);
+    return page; */
+}
+
+
+
+// swaps
+
+
+void swap_init(size_t size)
+{/* 
+    sema_init(&swap_sema, 1);
+    swap_bitmap = bitmap_create (size); */
+}
+
+void swap_in(size_t used_index, void* kaddr)
+{
+}
+
+size_t swap_out(void* kaddr)
+{
+
+}
+
+void swap_clear (size_t used_index)
+{
+}

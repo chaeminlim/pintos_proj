@@ -5,6 +5,7 @@
 #include <list.h>
 #include <hash.h>
 #include "filesys/file.h"
+#include "threads/palloc.h"
 
 typedef int mapid_t;
 
@@ -13,6 +14,14 @@ enum PG_TYPE
     PG_BINARY,
     PG_ANON,
     PG_FILE
+};
+
+struct page
+{
+    void* kaddr;
+    struct thread* thread;
+    struct vm_area_struct* vma;
+    struct list_elem lru_elem;
 };
 
 struct vm_area_struct
@@ -50,11 +59,12 @@ void init_vm(struct hash*);
 bool delete_vma(struct mm_struct* mm_struct, struct vm_area_struct* vma);
 bool insert_vma(struct mm_struct* mm_struct, struct vm_area_struct* vma);
 void free_vm(struct mm_struct* mm);
-void free_vma(struct hash_elem* e, void* aux);
+void destroy_vma(struct hash_elem* e, void* aux);
 struct vm_area_struct* get_vma_with_vaddr(struct mm_struct* mm_struct, void* vaddr);
 mapid_t allocate_mapid(void);
 void free_vaddr_page(void* vaddr);
+void free_kaddr_page(void* kaddr);
 struct mmap_struct* find_mmap_struct(mapid_t mapping);
-
+struct page* allocate_page(enum palloc_flags flags, struct vm_area_struct* vma);
 
 #endif

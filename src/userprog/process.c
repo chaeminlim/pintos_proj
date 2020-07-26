@@ -20,6 +20,7 @@
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
 #include "vm/page.h"
+#include "vm/swap.h"
 
 extern struct semaphore filesys_sema;
 static thread_func start_process NO_RETURN;
@@ -509,14 +510,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp, const char* cmd_line) 
 {
-  uint8_t *kpage;
+  struct page* kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = allocate_page(PAL_USER | PAL_ZERO, NULL);
   
   if (kpage != NULL) 
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
       if (success) // install page가 성공했을 때, 여기서 부터 argument passing 적용
       {
         // vm
@@ -526,6 +527,7 @@ setup_stack (void **esp, const char* cmd_line)
         vma->vaddr = (uint8_t*)PHYS_BASE - PGSIZE;
         vma->type = PG_ANON;
         vma->read_only = false;
+        kpage->vma = vma;
         insert_vma(&thread_current()->mm_struct, vma);
         
         *esp = PHYS_BASE;
@@ -597,7 +599,7 @@ setup_stack (void **esp, const char* cmd_line)
        
       }
       else
-        palloc_free_page (kpage);
+        free_kaddr_page(kpage->kaddr);
     }
   return success;
 }
@@ -644,7 +646,7 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
 {
   // 유저 페이지 할당
   
-   void* kpage = palloc_get_page (PAL_USER);
+   struct page* kpage = allocate_page(PAL_USER, vma);
    if (kpage == NULL) return false;
    // vma의 타입에 따라
    switch(vma->type)
@@ -652,11 +654,10 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
       case PG_FILE:
       case PG_BINARY:
       {
-        if (!load_file (kpage, vma) ||
-            !install_page (vma->vaddr, kpage, !vma->read_only))
+        if (!load_file (kpage->kaddr, vma) ||
+            !install_page (vma->vaddr, kpage->kaddr, !vma->read_only))
           {
-            NOT_REACHED ();
-            palloc_free_page (kpage);
+            free_kaddr_page(kpage->kaddr);
             return false;
           }
         vma->loaded = true;

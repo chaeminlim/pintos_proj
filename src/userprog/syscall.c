@@ -472,7 +472,7 @@ void munmap(mapid_t mapping)
         {
           if (file_write_at (vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
           {  sema_up(&filesys_sema); NOT_REACHED (); }
-          free_vaddr_page (vma->vaddr);
+          free_vaddr_page(vma->vaddr);
         }
       vma->loaded = false;
       e = list_remove (e);
