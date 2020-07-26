@@ -53,6 +53,7 @@ syscall_handler (struct intr_frame *f)
 { 
   int syscall_number = *(int*)(f->esp);
   //printf ("system call! number: %d\n", syscall_number);
+  
   switch(syscall_number)
   {
     case SYS_HALT:
@@ -137,10 +138,10 @@ syscall_handler (struct intr_frame *f)
       is_safe_addr(f->esp + 8);
       is_safe_addr(f->esp + 4);
       unsigned int size = *(unsigned int*)(f->esp+12);
-      void* buffer = (void*)*((int*)f->esp + 2);
-      is_buffer_safe(buffer, size);
+      void* str = (char*)*((int*)f->esp + 2);
+      is_string_safe(str);
       int fd = *(int*)(f->esp+4);
-      f->eax = write(fd, buffer, size);
+      f->eax = write(fd, str, size);
       break;
     }
     case SYS_SEEK:
@@ -286,13 +287,14 @@ int open(char *file)
 
 int read(int fd, void* buffer, unsigned size)
 {
-  struct thread* curr = thread_current();
-  int ret;
+  
   sema_down(&mutex);
   reader_count++;
   if(reader_count == 1) sema_down(&writer_sema);
   sema_up(&mutex);
   sema_down(&filesys_sema);
+  struct thread* curr = thread_current();
+  int ret;
   if(fd == 1) ret = -1;
   else if(fd == 0) 
   {
@@ -322,11 +324,12 @@ int read(int fd, void* buffer, unsigned size)
 
 int write(int fd, const void* buffer, unsigned size)
 {
-  struct thread* curr = thread_current();
-  int ret;
+  
   //printf("try lock acquire ! %d\n", curr->tid);
   sema_down(&writer_sema);
   sema_down(&filesys_sema);
+  struct thread* curr = thread_current();
+  int ret;
   //printf("lock acquire ! %d\n", curr->tid);
   if(fd == 0) ret = -1;
   else if(fd == 1)
@@ -404,32 +407,31 @@ mapid_t mmap(int fd, void *addr)
 {
   if (pg_ofs (addr) != 0) return -1;
   if(fd == 0 || fd == 1) return -1;
+  if((unsigned)addr < USER_STACK_BOTTOM) return -1;
+  if (is_user_vaddr (addr) == false) return -1;
   // lock
-  sema_down(&filesys_sema);
   struct file* target_file = thread_current()->fd_table[fd];
-  if(target_file == NULL) { sema_up(&filesys_sema);  return -1; }
+  if(target_file == NULL) {   return -1; }
   struct file* file_reopened = file_reopen(target_file);
-  if(file_reopened == NULL) { sema_up(&filesys_sema); return -1; }
+  if(file_reopened == NULL) {  return -1; }
   else
   {
-    mapid_t mapid = allocate_mapid();
     // alloc mmap struct
     struct mmap_struct* mmap_strt = (struct mmap_struct*)malloc(sizeof(struct mmap_struct)); // need to free
     // setup
-    if(mmap_strt == NULL) {sema_up(&filesys_sema); return -1; }
-    mmap_strt->file = file_reopened;
-    mmap_strt->mapid = mapid;
-    // vma-> list 초기화
-    list_init(&mmap_strt->vma_list);
-    // mmap list 에 푸시
-    list_push_back(&thread_current()->mm_struct.mmap_list, &mmap_strt->mmap_elem);
+    if(mmap_strt == NULL) { return -1; }
     
-    off_t file_len = file_length(file_reopened);
+    memset(mmap_strt, 0, sizeof(struct mmap_struct));
+    list_init(&mmap_strt->vma_list);
+    mmap_strt->file = file_reopened;
+    mmap_strt->mapid = allocate_mapid();
+    list_push_back(&thread_current()->mm_struct.mmap_list, &mmap_strt->mmap_elem);
+    off_t file_len = file_length(mmap_strt->file);
     size_t offset = 0;
     for(; file_len > 0;)
     {
       // 기존에 존재하는 vma라면
-      if(get_vma_with_vaddr(&thread_current()->mm_struct, addr)) { sema_up(&filesys_sema); return -1; }
+      if(get_vma_with_vaddr(&thread_current()->mm_struct, addr)) { return -1; }
       struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof (struct vm_area_struct));
       memset (vma, 0, sizeof(struct vm_area_struct));
       vma->type = PG_FILE;
@@ -448,37 +450,35 @@ mapid_t mmap(int fd, void *addr)
       file_len -= PGSIZE;
       
     }
-    sema_up(&filesys_sema);
-    return mapid;
+    
+    return mmap_strt->mapid;
   }
 }
 // free mmap_sturct
 void munmap(mapid_t mapping)
 {
-
-  sema_down(&filesys_sema);
   // find mmap _ struct
   struct mmap_struct* mmapstrt = find_mmap_struct(mapping);
-  if (!mmapstrt) { sema_up(&filesys_sema); return; }
-
+  if (!mmapstrt) {  return; }
   // m unmap !
   // 찾은 mmap struct의 vma list를 순회하면서, vma가 로드 되어있고  dirty bit이 1 이라면, 파일을 덮어쓰고,  vma->vaddr을 free 하고,
   // vma -> loaded를 false로 만들고, vma->list에서 제거 후, 해쉬 테이블에서도 제거한다/
   struct list_elem *e;
   for (e = list_begin (&mmapstrt->vma_list); e != list_end (&mmapstrt->vma_list); )
+  {
+    struct vm_area_struct* vma = list_entry (e, struct vm_area_struct, mmap_elem);
+    if (vma->loaded && pagedir_is_dirty(thread_current ()->pagedir, vma->vaddr))
     {
-      struct vm_area_struct* vma = list_entry (e, struct vm_area_struct, mmap_elem);
-      if (vma->loaded && pagedir_is_dirty(thread_current ()->pagedir, vma->vaddr))
-        {
-          if (file_write_at (vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
-          {  sema_up(&filesys_sema); NOT_REACHED (); }
-          free_vaddr_page(vma->vaddr);
-        }
-      vma->loaded = false;
-      e = list_remove (e);
-      delete_vma(&thread_current()->mm_struct, vma);
+      if (file_write_at (vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
+      {   NOT_REACHED (); }
+      free_vaddr_page(vma->vaddr);
     }
+    vma->loaded = false;
+    e = list_remove(e);
+    delete_vma(&thread_current()->mm_struct, vma);
+    
+  }
+
   list_remove (&mmapstrt->mmap_elem);
   free (mmapstrt);
-  sema_up(&filesys_sema);
 }

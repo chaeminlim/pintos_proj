@@ -11,7 +11,7 @@
 #include "lib/string.h"
 #include "vm/swap.h"
 
-extern struct semaphore lru_sema;
+extern struct lock lru_lock;
 
 unsigned int vm_hash_func(const struct hash_elem* e, void* aux);
 bool vm_func_less (const struct hash_elem* e1,const struct hash_elem* e2, void* aux);
@@ -27,11 +27,9 @@ struct page* allocate_page(enum palloc_flags flags, struct vm_area_struct* vma)
     if(page->kaddr == NULL)
     {
         free(page);
+        //swap_pages();
         return NULL;
     }
-    sema_down(&lru_sema);
-    add_page_lru(page);
-    sema_up(&lru_sema);
     return page;
 }
 
@@ -107,12 +105,14 @@ void destroy_vma(struct hash_elem* e, void* aux UNUSED)
 
 void free_vaddr_page(void* vaddr)
 {
-    free_kaddr_page (pagedir_get_page (thread_current ()->pagedir, vaddr));
+    void* kaddr = pagedir_get_page (thread_current ()->pagedir, vaddr);
+    free_kaddr_page (kaddr);
 }
 
 void free_kaddr_page(void* kaddr)
 {
-    sema_down(&lru_sema);
+    if(kaddr == NULL) return;
+    lock_acquire(&lru_lock);
     struct page *page = find_page_from_lru_list(kaddr);
     if (page)
     {
@@ -123,7 +123,7 @@ void free_kaddr_page(void* kaddr)
         palloc_free_page(page->kaddr);
         free(page);
     }
-    sema_up(&lru_sema);
+    lock_release(&lru_lock);
 }
 
 void free_vm(struct mm_struct* mm)

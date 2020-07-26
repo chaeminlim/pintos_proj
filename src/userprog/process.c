@@ -23,6 +23,7 @@
 #include "vm/swap.h"
 
 extern struct semaphore filesys_sema;
+extern struct lock lru_lock;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -515,6 +516,10 @@ setup_stack (void **esp, const char* cmd_line)
 
   kpage = allocate_page(PAL_USER | PAL_ZERO, NULL);
   
+  lock_acquire(&lru_lock);
+  add_page_lru(kpage);
+  lock_release(&lru_lock);
+
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
@@ -523,6 +528,7 @@ setup_stack (void **esp, const char* cmd_line)
         // vm
         struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof(struct vm_area_struct));
         if (vma == NULL) return false;
+        memset(vma, 0, sizeof(struct vm_area_struct));
         vma->loaded = true;
         vma->vaddr = (uint8_t*)PHYS_BASE - PGSIZE;
         vma->type = PG_ANON;
@@ -530,11 +536,13 @@ setup_stack (void **esp, const char* cmd_line)
         kpage->vma = vma;
         insert_vma(&thread_current()->mm_struct, vma);
         
+        
         *esp = PHYS_BASE;
         // setting argument 시작
         uint8_t* temp_head;
         int total_len = 0;
         int argc = 0;
+
         // 스택 포인터의 주소를 내리면서, 낮은 주소에서 높은 방향으로 문자열을 쌓아야 함.
         
         // argument string 쌓기
@@ -644,28 +652,35 @@ bool load_file (void *kaddr, struct vm_area_struct *vma)
 
 bool allocate_vm_page_mm(struct vm_area_struct* vma)
 {
-  // 유저 페이지 할당
-  
-   struct page* kpage = allocate_page(PAL_USER, vma);
-   if (kpage == NULL) return false;
-   // vma의 타입에 따라
-   switch(vma->type)
-   {
-      case PG_FILE:
-      case PG_BINARY:
-      {
-        if (!load_file (kpage->kaddr, vma) ||
-            !install_page (vma->vaddr, kpage->kaddr, !vma->read_only))
-          {
-            free_kaddr_page(kpage->kaddr);
-            return false;
-          }
-        vma->loaded = true;
-        return true;
-      } 
+  struct page* kpage = allocate_page(PAL_USER, vma);
+  ASSERT (kpage != NULL);
+  ASSERT (pg_ofs (kpage->kaddr) == 0);
+  ASSERT (vma != NULL);
+  // vma의 타입에 따라
+  switch(vma->type)
+  {
+    case PG_BINARY:
+    case PG_FILE:
+    {
+      if (!load_file (kpage->kaddr, vma) ||
+          !install_page (vma->vaddr, kpage->kaddr, !vma->read_only))
+        {
+          NOT_REACHED();
+        }
+      vma->loaded = true;
+      
+      lock_acquire(&lru_lock);
+      add_page_lru(kpage);
+      lock_release(&lru_lock);
+      
+      return true;
+    }
+    case PG_ANON:
+    {
 
-      default:
-         return false;
-   }
+    }
+    default:
+        NOT_REACHED();
+  }
 }
 
