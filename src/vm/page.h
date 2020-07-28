@@ -35,6 +35,7 @@ struct vm_area_struct
     size_t offset;
     size_t read_bytes;
     size_t zero_bytes;
+    size_t swap_slot;
     struct hash_elem elem;
     struct list_elem mmap_elem;
 };

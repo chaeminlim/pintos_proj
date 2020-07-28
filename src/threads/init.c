@@ -96,7 +96,7 @@ main (void)
           init_ram_pages * PGSIZE / 1024);
 
   /* Initialize memory system. */
-  init_lru_list();
+  
   palloc_init (user_page_limit);
   malloc_init ();
   paging_init ();
@@ -116,7 +116,8 @@ main (void)
   exception_init ();
   syscall_init ();
 #endif
-
+  swap_init(8 * 1024);
+  init_lru_list();
   /* Start thread scheduler and enable interrupts. */
   thread_start ();
   serial_init_queue ();

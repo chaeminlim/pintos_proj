@@ -24,11 +24,11 @@ struct page* allocate_page(enum palloc_flags flags, struct vm_area_struct* vma)
     page->thread = thread_current();
     page->vma = vma;
     page->kaddr = palloc_get_page(flags);
-    if(page->kaddr == NULL)
+    while(page->kaddr == NULL)
     {
-        free(page);
-        //swap_pages();
-        return NULL;
+        //free(page);
+        swap_pages();
+        page->kaddr = palloc_get_page(flags);
     }
     return page;
 }

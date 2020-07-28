@@ -1,8 +1,3 @@
-cd build && make check
-make[1]: Entering directory '/workspace/pintos_v/pintos/src/vm/build'
-gcc -m32 -c ../../vm/page.c -o vm/page.o -g -msoft-float -O -march=i686 -fno-stack-protector -nostdinc -I../.. -I../../lib -I../../lib/kernel -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers -DUSERPROG -DFILESYS -DVM -MMD -MF vm/page.d
-ld -melf_i386 -T threads/kernel.lds.s -o kernel.o threads/start.o threads/init.o threads/thread.o threads/switch.o threads/interrupt.o threads/intr-stubs.o threads/synch.o threads/palloc.o threads/malloc.o threads/fixed_point.o devices/pit.o devices/timer.o devices/kbd.o devices/vga.o devices/serial.o devices/block.o devices/partition.o devices/ide.o devices/input.o devices/intq.o devices/rtc.o devices/shutdown.o devices/speaker.o lib/debug.o lib/random.o lib/stdio.o lib/stdlib.o lib/string.o lib/arithmetic.o lib/ustar.o lib/kernel/debug.o lib/kernel/list.o lib/kernel/bitmap.o lib/kernel/hash.o lib/kernel/console.o userprog/process.o userprog/pagedir.o userprog/exception.o userprog/syscall.o userprog/gdt.o userprog/tss.o filesys/filesys.o filesys/free-map.o filesys/file.o filesys/directory.o filesys/inode.o filesys/fsutil.o vm/page.o
-objcopy -R .note -R .comment -S kernel.o kernel.bin
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/args-none -a args-none --swap-size=4 -- -q  -f run args-none < /dev/null 2> tests/userprog/args-none.errors > tests/userprog/args-none.output
 perl -I../.. ../../tests/userprog/args-none.ck tests/userprog/args-none tests/userprog/args-none.result
 pass tests/userprog/args-none
@@ -286,31 +281,16 @@ Differences in `diff -u' format:
 (Process exit codes are excluded for matching purposes.)
 pintos -v -k -T 300 --bochs  --filesys-size=2 -p tests/vm/page-linear -a page-linear --swap-size=4 -- -q  -f run page-linear < /dev/null 2> tests/vm/page-linear.errors > tests/vm/page-linear.output
 perl -I../.. ../../tests/vm/page-linear.ck tests/vm/page-linear tests/vm/page-linear.result
-FAIL tests/vm/page-linear
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (page-linear) begin
-  (page-linear) initialize
-  (page-linear) read pass
-  (page-linear) read/modify/write pass one
-  (page-linear) read/modify/write pass two
-  (page-linear) read pass
-  (page-linear) end
-Differences in `diff -u' format:
-  (page-linear) begin
-  (page-linear) initialize
-- (page-linear) read pass
-- (page-linear) read/modify/write pass one
-- (page-linear) read/modify/write pass two
-- (page-linear) read pass
-- (page-linear) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/page-linear
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/page-parallel -a page-parallel -p tests/vm/child-linear -a child-linear --swap-size=4 -- -q  -f run page-parallel < /dev/null 2> tests/vm/page-parallel.errors > tests/vm/page-parallel.output
 perl -I../.. ../../tests/vm/page-parallel.ck tests/vm/page-parallel tests/vm/page-parallel.result
 FAIL tests/vm/page-parallel
-run: wait for child 0: FAILED
+Kernel panic in run: PANIC at ../../threads/thread.c:311 in thread_current(): assertion `is_thread (t)' failed.
+Call stack: 0xc002a836 0x635f6461
+Translation of call stack:
+In kernel.o:
+0xc002a836: debug_panic (.../../lib/kernel/debug.c:38)
+0x635f6461: (unknown)
 pintos -v -k -T 600 --bochs  --filesys-size=2 -p tests/vm/page-merge-seq -a page-merge-seq -p tests/vm/child-sort -a child-sort --swap-size=4 -- -q  -f run page-merge-seq < /dev/null 2> tests/vm/page-merge-seq.errors > tests/vm/page-merge-seq.output
 perl -I../.. ../../tests/vm/page-merge-seq.ck tests/vm/page-merge-seq tests/vm/page-merge-seq.result
 FAIL tests/vm/page-merge-seq
@@ -350,8 +330,7 @@ perl -I../.. ../../tests/vm/mmap-write.ck tests/vm/mmap-write tests/vm/mmap-writ
 pass tests/vm/mmap-write
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-exit -a mmap-exit -p tests/vm/child-mm-wrt -a child-mm-wrt --swap-size=4 -- -q  -f run mmap-exit < /dev/null 2> tests/vm/mmap-exit.errors > tests/vm/mmap-exit.output
 perl -I../.. ../../tests/vm/mmap-exit.ck tests/vm/mmap-exit tests/vm/mmap-exit.result
-FAIL tests/vm/mmap-exit
-run: 512 bytes read starting at offset 0 in "sample.txt" differ from expected: FAILED
+pass tests/vm/mmap-exit
 pintos -v -k -T 600 --bochs  --filesys-size=2 -p tests/vm/mmap-shuffle -a mmap-shuffle --swap-size=4 -- -q  -f run mmap-shuffle < /dev/null 2> tests/vm/mmap-shuffle.errors > tests/vm/mmap-shuffle.output
 perl -I../.. ../../tests/vm/mmap-shuffle.ck tests/vm/mmap-shuffle tests/vm/mmap-shuffle.result
 pass tests/vm/mmap-shuffle
@@ -360,31 +339,7 @@ perl -I../.. ../../tests/vm/mmap-bad-fd.ck tests/vm/mmap-bad-fd tests/vm/mmap-ba
 pass tests/vm/mmap-bad-fd
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-clean -a mmap-clean -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-clean < /dev/null 2> tests/vm/mmap-clean.errors > tests/vm/mmap-clean.output
 perl -I../.. ../../tests/vm/mmap-clean.ck tests/vm/mmap-clean tests/vm/mmap-clean.result
-FAIL tests/vm/mmap-clean
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (mmap-clean) begin
-  (mmap-clean) open "sample.txt"
-  (mmap-clean) mmap "sample.txt"
-  (mmap-clean) write "sample.txt"
-  (mmap-clean) munmap "sample.txt"
-  (mmap-clean) seek "sample.txt"
-  (mmap-clean) read "sample.txt"
-  (mmap-clean) file change was retained after munmap
-  (mmap-clean) end
-Differences in `diff -u' format:
-  (mmap-clean) begin
-  (mmap-clean) open "sample.txt"
-  (mmap-clean) mmap "sample.txt"
-  (mmap-clean) write "sample.txt"
-- (mmap-clean) munmap "sample.txt"
-- (mmap-clean) seek "sample.txt"
-- (mmap-clean) read "sample.txt"
-- (mmap-clean) file change was retained after munmap
-- (mmap-clean) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/mmap-clean
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-inherit -a mmap-inherit -p ../../tests/vm/sample.txt -a sample.txt -p tests/vm/child-inherit -a child-inherit --swap-size=4 -- -q  -f run mmap-inherit < /dev/null 2> tests/vm/mmap-inherit.errors > tests/vm/mmap-inherit.output
 perl -I../.. ../../tests/vm/mmap-inherit.ck tests/vm/mmap-inherit tests/vm/mmap-inherit.result
 pass tests/vm/mmap-inherit
@@ -393,8 +348,7 @@ perl -I../.. ../../tests/vm/mmap-misalign.ck tests/vm/mmap-misalign tests/vm/mma
 pass tests/vm/mmap-misalign
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-null -a mmap-null -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-null < /dev/null 2> tests/vm/mmap-null.errors > tests/vm/mmap-null.output
 perl -I../.. ../../tests/vm/mmap-null.ck tests/vm/mmap-null tests/vm/mmap-null.result
-FAIL tests/vm/mmap-null
-run: try to mmap at address 0: FAILED
+pass tests/vm/mmap-null
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/mmap-over-code -a mmap-over-code -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-over-code < /dev/null 2> tests/vm/mmap-over-code.errors > tests/vm/mmap-over-code.output
 perl -I../.. ../../tests/vm/mmap-over-code.ck tests/vm/mmap-over-code tests/vm/mmap-over-code.result
 pass tests/vm/mmap-over-code
@@ -442,7 +396,12 @@ perl -I../.. ../../tests/filesys/base/sm-seq-random.ck tests/filesys/base/sm-seq
 pass tests/filesys/base/sm-seq-random
 pintos -v -k -T 300 --bochs  --filesys-size=2 -p tests/filesys/base/syn-read -a syn-read -p tests/filesys/base/child-syn-read -a child-syn-read --swap-size=4 -- -q  -f run syn-read < /dev/null 2> tests/filesys/base/syn-read.errors > tests/filesys/base/syn-read.output
 perl -I../.. ../../tests/filesys/base/syn-read.ck tests/filesys/base/syn-read tests/filesys/base/syn-read.result
-pass tests/filesys/base/syn-read
+FAIL tests/filesys/base/syn-read
+Kernel panic in run: PANIC at ../../lib/kernel/list.c:84 in list_next(): assertion `is_head (elem) || is_interior (elem)' failed.
+Call stack: 0xc002a836 0x78656e5fc
+Translation of call stack:
+0xc002a836: debug_panic (.../../lib/kernel/debug.c:38)
+0x78656e5fc: (unknown)
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/filesys/base/syn-remove -a syn-remove --swap-size=4 -- -q  -f run syn-remove < /dev/null 2> tests/filesys/base/syn-remove.errors > tests/filesys/base/syn-remove.output
 perl -I../.. ../../tests/filesys/base/syn-remove.ck tests/filesys/base/syn-remove tests/filesys/base/syn-remove.result
 pass tests/filesys/base/syn-remove
@@ -524,7 +483,7 @@ pass tests/vm/pt-bad-read
 pass tests/vm/pt-write-code
 pass tests/vm/pt-write-code2
 FAIL tests/vm/pt-grow-stk-sc
-FAIL tests/vm/page-linear
+pass tests/vm/page-linear
 FAIL tests/vm/page-parallel
 FAIL tests/vm/page-merge-seq
 FAIL tests/vm/page-merge-par
@@ -537,13 +496,13 @@ pass tests/vm/mmap-unmap
 pass tests/vm/mmap-overlap
 pass tests/vm/mmap-twice
 pass tests/vm/mmap-write
-FAIL tests/vm/mmap-exit
+pass tests/vm/mmap-exit
 pass tests/vm/mmap-shuffle
 pass tests/vm/mmap-bad-fd
-FAIL tests/vm/mmap-clean
+pass tests/vm/mmap-clean
 pass tests/vm/mmap-inherit
 pass tests/vm/mmap-misalign
-FAIL tests/vm/mmap-null
+pass tests/vm/mmap-null
 pass tests/vm/mmap-over-code
 pass tests/vm/mmap-over-data
 pass tests/vm/mmap-over-stk
@@ -559,10 +518,8 @@ pass tests/filesys/base/sm-full
 pass tests/filesys/base/sm-random
 pass tests/filesys/base/sm-seq-block
 pass tests/filesys/base/sm-seq-random
-pass tests/filesys/base/syn-read
+FAIL tests/filesys/base/syn-read
 pass tests/filesys/base/syn-remove
 pass tests/filesys/base/syn-write
-13 of 113 tests failed.
+10 of 113 tests failed.
 ../../tests/Make.tests:26: recipe for target 'check' failed
-make[1]: Leaving directory '/workspace/pintos_v/pintos/src/vm/build'
-../Makefile.kernel:10: recipe for target 'check' failed

@@ -292,7 +292,7 @@ int read(int fd, void* buffer, unsigned size)
   reader_count++;
   if(reader_count == 1) sema_down(&writer_sema);
   sema_up(&mutex);
-  sema_down(&filesys_sema);
+  //sema_down(&filesys_sema);
   struct thread* curr = thread_current();
   int ret;
   if(fd == 1) ret = -1;
@@ -312,9 +312,10 @@ int read(int fd, void* buffer, unsigned size)
     {
       int rett = file_read(curr->fd_table[fd], buffer, size);
       ret = rett;
+      
     }
   }
-  sema_up(&filesys_sema);
+  //sema_up(&filesys_sema);
   sema_down(&mutex);
   reader_count--;
   if(reader_count == 0) sema_up(&writer_sema);

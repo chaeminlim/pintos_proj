@@ -133,9 +133,7 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
-  
-  // clear fd
+// clear fd
   int i = 0;
   for(; i < 128; i++)
   {
@@ -152,15 +150,11 @@ process_exit (void)
         remove_mmap (cur ,mmstrt);
   }
 
-  free(cur->fd_table);
-  // clear vm
-  
-
   #ifdef USERPROG
   file_close(cur->executing_file);
   #endif
-
-
+  free(cur->fd_table);
+  // clear vm
   free_vm(&cur->mm_struct);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -688,7 +682,19 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
     }
     case PG_ANON:
     {
-
+      swap_in (vma->swap_slot, kpage->kaddr);
+      ASSERT (pg_ofs (kpage->kaddr) == 0);
+      if (!install_page (vma->vaddr, kpage->kaddr, !vma->read_only))
+        {
+          NOT_REACHED ();
+          free_kaddr_page(kpage);
+          return false; 
+        }
+      vma->loaded = true;
+      lock_acquire(&lru_lock);
+      add_page_lru(kpage);
+      lock_release(&lru_lock);
+      return true;
     }
     default:
         NOT_REACHED();

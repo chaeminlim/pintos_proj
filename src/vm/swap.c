@@ -16,11 +16,13 @@ struct bitmap* swap_bitmap;
 extern struct semaphore filesys_sema;
 
 
+
 void init_lru_list(void)
 {
     list_init(&lru_list);
     lock_init(&lru_lock);
     lru_clock = NULL;
+
 }
 
 void add_page_lru(struct page* page)
@@ -63,21 +65,22 @@ struct page* find_page_from_lru_list(void *kaddr)
 void swap_pages()
 {
     lock_acquire(&lru_lock);
+    
     struct page *victim = get_victim();
     ASSERT (victim != NULL);
     ASSERT (victim->thread != NULL);
     ASSERT (victim->thread->magic == 0xcd6abf4b);
     ASSERT (victim->vma != NULL);
     bool dirty = pagedir_is_dirty (victim->thread->pagedir, victim->vma->vaddr);
+    
     switch (victim->vma->type)
-        {
+    {
         case PG_BINARY:
         {
             if (dirty)
             {
-                /* victim->vma->swap_slot = swap_out(victim->paddr);
-                victim->vma->type = PG_ANON; */
-                
+                victim->vma->swap_slot = swap_out(victim->kaddr);
+                victim->vma->type = PG_ANON;
             }
             break;
         }
@@ -86,30 +89,29 @@ void swap_pages()
         {
             if (dirty)
             {
-                if (file_write_at (victim->vma->file, victim->vma->vaddr,
-                                victim->vma->read_bytes, victim->vma->offset)
-                != (int) victim->vma->read_bytes)
-                NOT_REACHED();
+                if (file_write_at (victim->vma->file, victim->vma->vaddr, victim->vma->read_bytes, victim->vma->offset)
+                != (int) victim->vma->read_bytes) NOT_REACHED();
             }
             break;
         }
             
         case PG_ANON:
         {
-            //victim->vma->swap_slot = swap_out(victim->paddr);
+            victim->vma->swap_slot = swap_out(victim->kaddr);
             break;
         }
         default:
             NOT_REACHED ();
-        }
+    }
     victim->vma->loaded = false;
-    free_kaddr_page(victim->kaddr);
     lock_release(&lru_lock);
+    free_kaddr_page(victim->kaddr);
+    
 }
 
 struct list_elem * get_next_lru_clock (void)
-{/* 
-    ASSERT(is_curr_hold_lru_lock());
+{
+    ASSERT(lock_held_by_current_thread(&lru_lock));
     if (lru_clock == NULL || lru_clock == list_end (&lru_list))
     {
         if (list_empty (&lru_list)) return NULL;
@@ -117,7 +119,7 @@ struct list_elem * get_next_lru_clock (void)
     }
     lru_clock = list_next (lru_clock);
     if (lru_clock == list_end (&lru_list)) return get_next_lru_clock ();
-    return lru_clock; */
+    return lru_clock;
 }
 
 struct page* get_victim (void)
@@ -141,7 +143,6 @@ struct page* get_victim (void)
     
     return page;
 }
-
 
 
 // swaps
@@ -205,4 +206,9 @@ size_t swap_out(void* kaddr)
 
 void swap_clear (size_t used_index)
 {
+    if (used_index-- == 0)
+        return;
+    sema_down (&swap_sema);
+    bitmap_set_multiple (swap_bitmap, used_index, 1, false);
+    sema_up(&swap_sema);
 }
