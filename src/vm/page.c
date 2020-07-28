@@ -133,6 +133,8 @@ void free_vm(struct mm_struct* mm)
 
 mapid_t allocate_mapid()
 {
-    return thread_current()->mm_struct.next_mapid++;
+    mapid_t ret = thread_current()->mm_struct.next_mapid;
+    thread_current()->mm_struct.next_mapid += 1;
+    return ret;
 }
 

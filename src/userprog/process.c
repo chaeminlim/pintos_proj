@@ -24,6 +24,7 @@
 
 extern struct semaphore filesys_sema;
 extern struct lock lru_lock;
+extern struct semaphore writer_sema;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -141,16 +142,26 @@ process_exit (void)
     if(cur->fd_table[i] != NULL) file_close(cur->fd_table[i]);
   }
   //palloc_free_page (cur->fd_table);
+  
+  int mapid = 0;
+  for(; mapid < cur->mm_struct.next_mapid; mapid++)
+  {
+    
+    struct mmap_struct *mmstrt = find_mmap_struct(mapid);
+      if (mmstrt)
+        remove_mmap (cur ,mmstrt);
+  }
+
   free(cur->fd_table);
   // clear vm
-  free_vm(&cur->mm_struct);
+  
 
   #ifdef USERPROG
   file_close(cur->executing_file);
   #endif
 
-  
 
+  free_vm(&cur->mm_struct);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -684,3 +695,24 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
   }
 }
 
+void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
+{
+  sema_down(&writer_sema);
+  struct list_elem *e;
+  for (e = list_begin (&mmapstrt->vma_list); e != list_end (&mmapstrt->vma_list); )
+  {
+    struct vm_area_struct* vma = list_entry (e, struct vm_area_struct, mmap_elem);
+    if (vma->loaded && pagedir_is_dirty(curr->pagedir, vma->vaddr))
+    {
+      if (file_write_at (vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
+      {   NOT_REACHED (); }
+      free_vaddr_page(vma->vaddr);
+    }
+    vma->loaded = false;
+    e = list_remove(e);
+    delete_vma(&curr->mm_struct, vma); 
+  }
+  list_remove(&mmapstrt->mmap_elem);
+  free(mmapstrt);
+  sema_up(&writer_sema);
+}

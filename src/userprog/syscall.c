@@ -327,7 +327,7 @@ int write(int fd, const void* buffer, unsigned size)
   
   //printf("try lock acquire ! %d\n", curr->tid);
   sema_down(&writer_sema);
-  sema_down(&filesys_sema);
+  //sema_down(&filesys_sema);
   struct thread* curr = thread_current();
   int ret;
   //printf("lock acquire ! %d\n", curr->tid);
@@ -347,7 +347,7 @@ int write(int fd, const void* buffer, unsigned size)
     }
   }
   //printf("lock release ! %d\n", curr->tid);
-  sema_up(&filesys_sema);
+  //sema_up(&filesys_sema);
   sema_up(&writer_sema);
   return ret;
 }
@@ -463,22 +463,6 @@ void munmap(mapid_t mapping)
   // m unmap !
   // 찾은 mmap struct의 vma list를 순회하면서, vma가 로드 되어있고  dirty bit이 1 이라면, 파일을 덮어쓰고,  vma->vaddr을 free 하고,
   // vma -> loaded를 false로 만들고, vma->list에서 제거 후, 해쉬 테이블에서도 제거한다/
-  struct list_elem *e;
-  for (e = list_begin (&mmapstrt->vma_list); e != list_end (&mmapstrt->vma_list); )
-  {
-    struct vm_area_struct* vma = list_entry (e, struct vm_area_struct, mmap_elem);
-    if (vma->loaded && pagedir_is_dirty(thread_current ()->pagedir, vma->vaddr))
-    {
-      if (file_write_at (vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
-      {   NOT_REACHED (); }
-      free_vaddr_page(vma->vaddr);
-    }
-    vma->loaded = false;
-    e = list_remove(e);
-    delete_vma(&thread_current()->mm_struct, vma);
-    
-  }
-
-  list_remove (&mmapstrt->mmap_elem);
-  free (mmapstrt);
+  remove_mmap(thread_current(), mmapstrt);
 }
+
