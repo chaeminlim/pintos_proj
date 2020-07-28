@@ -285,11 +285,11 @@ pass tests/vm/page-linear
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/page-parallel -a page-parallel -p tests/vm/child-linear -a child-linear --swap-size=4 -- -q  -f run page-parallel < /dev/null 2> tests/vm/page-parallel.errors > tests/vm/page-parallel.output
 perl -I../.. ../../tests/vm/page-parallel.ck tests/vm/page-parallel tests/vm/page-parallel.result
 FAIL tests/vm/page-parallel
-Kernel panic in run: PANIC at ../../threads/thread.c:311 in thread_current(): assertion `is_thread (t)' failed.
-Call stack: 0xc002a836 0x635f6461
+Kernel panic in run: PANIC at ../../threads/thread.c:302 in thread_current(): assertion `is_thread (t)' failed.
+Call stack: 0xc002a926 0x635f6461
 Translation of call stack:
 In kernel.o:
-0xc002a836: debug_panic (.../../lib/kernel/debug.c:38)
+0xc002a926: debug_panic (.../../lib/kernel/debug.c:38)
 0x635f6461: (unknown)
 pintos -v -k -T 600 --bochs  --filesys-size=2 -p tests/vm/page-merge-seq -a page-merge-seq -p tests/vm/child-sort -a child-sort --swap-size=4 -- -q  -f run page-merge-seq < /dev/null 2> tests/vm/page-merge-seq.errors > tests/vm/page-merge-seq.output
 perl -I../.. ../../tests/vm/page-merge-seq.ck tests/vm/page-merge-seq tests/vm/page-merge-seq.result
@@ -302,7 +302,11 @@ run: wait for child 0: FAILED
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/page-merge-stk -a page-merge-stk -p tests/vm/child-qsort -a child-qsort --swap-size=4 -- -q  -f run page-merge-stk < /dev/null 2> tests/vm/page-merge-stk.errors > tests/vm/page-merge-stk.output
 perl -I../.. ../../tests/vm/page-merge-stk.ck tests/vm/page-merge-stk tests/vm/page-merge-stk.result
 FAIL tests/vm/page-merge-stk
-run: wait for child 0: FAILED
+Kernel panic in run: PANIC at ../../lib/kernel/list.c:282 in list_front(): assertion `!list_empty (list)' failed.
+Call stack: 0xc002a926 0x6f72665fc
+Translation of call stack:
+0xc002a926: debug_panic (.../../lib/kernel/debug.c:38)
+0x6f72665fc: (unknown)
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/page-merge-mm -a page-merge-mm -p tests/vm/child-qsort-mm -a child-qsort-mm --swap-size=4 -- -q  -f run page-merge-mm < /dev/null 2> tests/vm/page-merge-mm.errors > tests/vm/page-merge-mm.output
 perl -I../.. ../../tests/vm/page-merge-mm.ck tests/vm/page-merge-mm tests/vm/page-merge-mm.result
 FAIL tests/vm/page-merge-mm
@@ -396,12 +400,7 @@ perl -I../.. ../../tests/filesys/base/sm-seq-random.ck tests/filesys/base/sm-seq
 pass tests/filesys/base/sm-seq-random
 pintos -v -k -T 300 --bochs  --filesys-size=2 -p tests/filesys/base/syn-read -a syn-read -p tests/filesys/base/child-syn-read -a child-syn-read --swap-size=4 -- -q  -f run syn-read < /dev/null 2> tests/filesys/base/syn-read.errors > tests/filesys/base/syn-read.output
 perl -I../.. ../../tests/filesys/base/syn-read.ck tests/filesys/base/syn-read tests/filesys/base/syn-read.result
-FAIL tests/filesys/base/syn-read
-Kernel panic in run: PANIC at ../../lib/kernel/list.c:84 in list_next(): assertion `is_head (elem) || is_interior (elem)' failed.
-Call stack: 0xc002a836 0x78656e5fc
-Translation of call stack:
-0xc002a836: debug_panic (.../../lib/kernel/debug.c:38)
-0x78656e5fc: (unknown)
+pass tests/filesys/base/syn-read
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/filesys/base/syn-remove -a syn-remove --swap-size=4 -- -q  -f run syn-remove < /dev/null 2> tests/filesys/base/syn-remove.errors > tests/filesys/base/syn-remove.output
 perl -I../.. ../../tests/filesys/base/syn-remove.ck tests/filesys/base/syn-remove tests/filesys/base/syn-remove.result
 pass tests/filesys/base/syn-remove
@@ -518,8 +517,8 @@ pass tests/filesys/base/sm-full
 pass tests/filesys/base/sm-random
 pass tests/filesys/base/sm-seq-block
 pass tests/filesys/base/sm-seq-random
-FAIL tests/filesys/base/syn-read
+pass tests/filesys/base/syn-read
 pass tests/filesys/base/syn-remove
 pass tests/filesys/base/syn-write
-10 of 113 tests failed.
+9 of 113 tests failed.
 ../../tests/Make.tests:26: recipe for target 'check' failed

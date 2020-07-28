@@ -30,7 +30,8 @@ int load_avg;
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
-
+static struct list sleep_list;
+static int64_t next_tick_to_awake = INT64_MAX;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -99,7 +100,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  
+  list_init(&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -233,17 +234,7 @@ thread_create (const char *name, int priority,
   thread_unblock (t);
 
   /* Yield for preemption. */
-  old_level = intr_disable ();
-  if (!list_empty (&ready_list) 
-      && thread_current ()->curr_priority 
-      < list_entry (list_front (&ready_list), 
-      struct thread, elem)->curr_priority)
-  {
-    intr_set_level (old_level);
-    thread_yield ();
-  }
-  intr_set_level (old_level);
-
+  thread_preempt();
   //if (t->curr_priority > thread_get_priority ()) thread_yield ();
   return tid;             
 }
@@ -400,7 +391,8 @@ void
 thread_set_priority (int new_priority) 
 {
   if(thread_mlfqs == true) return;
-  struct thread *curr = thread_current ();
+  intr_disable();
+  struct thread *curr = thread_current();
   int old_curr_priority = curr->curr_priority;
   
   curr->origin_priority = new_priority;
@@ -419,7 +411,9 @@ thread_set_priority (int new_priority)
       curr->curr_priority = curr->origin_priority;
     }
     // priority가 최댓값으로 업데이트되면 yield될 상황 없음
-  }  
+  } 
+  intr_enable();
+  thread_preempt();
 }
 
 /* Returns the current thread's priority. */
@@ -792,6 +786,69 @@ int allocate_fd_id(struct thread* t)
     if(t->fd_table[i] == NULL) return i;
   }
   return -1;
+}
+
+static void
+update_next_tick_to_awake (int64_t tick)
+{
+  next_tick_to_awake = (next_tick_to_awake > tick) ? tick : next_tick_to_awake;
+}
+
+void thread_sleep(int64_t ticks)
+{
+  struct thread *cur;
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  cur = thread_current ();
+  ASSERT (cur != idle_thread);
+  update_next_tick_to_awake (cur->sleep_tick = ticks);
+  // 타이머 대기 리스트에 이 스레드를 추가합니다.
+  list_push_back (&sleep_list, &cur->elem);
+  thread_block ();
+  intr_set_level (old_level);
+}
+
+void thread_wakeup(int64_t ticks)
+{
+  struct thread* temp_thread;
+  
+  next_tick_to_awake = INT64_MAX;
+  struct list_elem* temp_elem = list_begin(&sleep_list);
+  for(; temp_elem != list_end(&sleep_list);)
+  {
+    temp_thread = list_entry(temp_elem, struct thread, elem);
+    if(temp_thread->sleep_tick <= ticks)
+    {
+      temp_elem = list_remove(&temp_thread->elem);
+      thread_unblock(temp_thread);
+    }else
+    {
+      temp_elem = list_next(temp_elem);
+      update_next_tick_to_awake(temp_thread->sleep_tick);
+    }
+  }
+}
+
+int64_t get_wake_tick(void)
+{
+  return next_tick_to_awake;
+}
+
+void thread_preempt (void)
+{
+  enum intr_level old_level;
+  old_level = intr_disable ();
+
+  // 대기 리스트가 비어 있으면 이 스레드를 제외하고 idle 스레드 하나 뿐입니다.
+  if (!list_empty (&ready_list) &&
+      thread_current ()->curr_priority
+      < list_entry (list_front (&ready_list), struct thread, elem)->curr_priority)
+    {
+      // 리스트의 첫 번째 스레드가 이 스레드보다 우선 실행되어야 하므로, 스케줄 반납합니다.
+      intr_set_level (old_level);
+      thread_yield ();
+    }
+  intr_set_level (old_level);
 }
 
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);

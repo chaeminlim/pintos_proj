@@ -1,6 +1,6 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
-
+#include <stddef.h>
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
@@ -195,4 +195,10 @@ void increase_recent_cpu(void);
    /* related with systemcalls*/
 struct thread* get_child_thread(tid_t);
 int allocate_fd_id(struct thread*);
+
+void thread_sleep(int64_t ticks);
+void thread_wakeup(int64_t ticks);
+int64_t get_wake_tick(void);
+void thread_preempt (void);
+
 #endif /* threads/thread.h */

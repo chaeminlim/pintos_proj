@@ -12,6 +12,8 @@ static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+bool allowed_stack_addr(int32_t addr, int32_t esp);
+
 /* Registers handlers for interrupts that can be caused by user
    programs.
 
@@ -147,11 +149,24 @@ page_fault (struct intr_frame *f)
    write = (f->error_code & PF_W) != 0;
    user = (f->error_code & PF_U) != 0;
 
-   if (!not_present) exit (-1);
-   struct vm_area_struct* vma = get_vma_with_vaddr(
-      &thread_current()->mm_struct, fault_addr);
-   if(vma == NULL) exit(-1);
-   if(!allocate_vm_page_mm(vma)) exit(-1);
+   bool flag = false;
+   if (not_present)
+   {
+      struct vm_area_struct* vma = get_vma_with_vaddr(&thread_current()->mm_struct, fault_addr);
+      if(vma != NULL)
+      {
+         flag = allocate_vm_page_mm(vma);
+      }
+      else
+      {
+         if(allowed_stack_addr((int32_t)fault_addr, (int32_t)f->esp))
+         {
+            flag = expand_stack(fault_addr);
+         }
+      }
+   }
+
+   if(!flag) exit(-1);
    
   //exit(-1);
   /* To implement virtual memory, delete the rest of the function
@@ -164,4 +179,9 @@ page_fault (struct intr_frame *f)
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f); */
+}
+
+bool allowed_stack_addr (int32_t addr, int32_t esp)
+{ 
+   return is_user_vaddr((void*)addr) && esp - 32 <= addr && ((int32_t)addr > (PHYS_BASE - ( 8 * 1024 * 1024)));
 }

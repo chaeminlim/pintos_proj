@@ -11,10 +11,10 @@
 struct list lru_list;
 struct lock lru_lock;
 struct list_elem* lru_clock;
-struct semaphore swap_sema;
+struct lock swap_lock;
 struct bitmap* swap_bitmap;
 extern struct semaphore filesys_sema;
-
+struct block *swap_block;
 
 
 void init_lru_list(void)
@@ -65,7 +65,7 @@ struct page* find_page_from_lru_list(void *kaddr)
 void swap_pages()
 {
     lock_acquire(&lru_lock);
-    
+
     struct page *victim = get_victim();
     ASSERT (victim != NULL);
     ASSERT (victim->thread != NULL);
@@ -79,7 +79,7 @@ void swap_pages()
         {
             if (dirty)
             {
-                victim->vma->swap_slot = swap_out(victim->kaddr);
+                victim->vma->swap_slot = swap_out(victim);
                 victim->vma->type = PG_ANON;
             }
             break;
@@ -97,7 +97,7 @@ void swap_pages()
             
         case PG_ANON:
         {
-            victim->vma->swap_slot = swap_out(victim->kaddr);
+            victim->vma->swap_slot = swap_out(victim);
             break;
         }
         default:
@@ -115,7 +115,7 @@ struct list_elem * get_next_lru_clock (void)
     if (lru_clock == NULL || lru_clock == list_end (&lru_list))
     {
         if (list_empty (&lru_list)) return NULL;
-        else return (lru_clock = list_begin (&lru_list));
+        else return (lru_clock = list_front(&lru_list));
     }
     lru_clock = list_next (lru_clock);
     if (lru_clock == list_end (&lru_list)) return get_next_lru_clock ();
@@ -148,67 +148,55 @@ struct page* get_victim (void)
 // swaps
 
 
-void swap_init(size_t size)
+void swap_init(void)
 {
-    sema_init(&swap_sema, 1);
-    swap_bitmap = bitmap_create (size); 
+	swap_block = block_get_role (BLOCK_SWAP);
+	swap_bitmap = bitmap_create(BLOCK_SECTOR_SIZE*block_size(swap_block)/PGSIZE);
+	bitmap_set_all (swap_bitmap, 0);
+	lock_init(&swap_lock);
+}
+
+size_t swap_out(struct page* page)
+{
+    int i;
+	size_t empty_slot_index;
+    lock_acquire(&swap_lock);
+	
+    empty_slot_index = bitmap_scan_and_flip(swap_bitmap, 0, 1, 0);
+
+	for (i = 0; i<SECTORS_PER_PAGE; i++)
+	{
+		block_write(swap_block, SECTORS_PER_PAGE*empty_slot_index + i, page->kaddr + i*BLOCK_SECTOR_SIZE);
+	}
+	page->vma->swap_slot = empty_slot_index;
+	lock_release(&swap_lock);
+	return empty_slot_index;
 }
 
 void swap_in(size_t used_index, void* kaddr)
 {
-    struct block* swap_block;
-    swap_block = block_get_role(BLOCK_SWAP);
-    if(used_index-- == 0) NOT_REACHED();
-    sema_down (&filesys_sema);
-    sema_down (&swap_sema);
-    used_index <<= 3;
-    int i;
-    for (i = 0; i < 8; i++)
-    {
-        block_read(swap_block, used_index + i, kaddr + BLOCK_SECTOR_SIZE * i);
-    }
-    used_index >>= 3;
-    bitmap_set_multiple(swap_bitmap, used_index, 1, false);
-    ASSERT (pg_ofs (kaddr) == 0);
-    sema_up(&swap_sema);
-    sema_up(&filesys_sema);
-}
 
-size_t swap_out(void* kaddr)
-{
-    struct block *swap_block;
-    swap_block = block_get_role (BLOCK_SWAP);
+    lock_acquire(&swap_lock);
+	int i;
 
-    sema_down (&filesys_sema);
-    sema_down (&swap_sema);
+    if (bitmap_test(swap_bitmap, used_index) == 0)
+	{
+		return;
+	}
+	bitmap_flip(swap_bitmap, used_index);
 
-    ASSERT (pg_ofs (kaddr) == 0);
-    size_t swap_index;
-    swap_index = bitmap_scan_and_flip (swap_bitmap, 0, 1, false);
-    if (BITMAP_ERROR == swap_index)
-    {
-    NOT_REACHED();
-    return BITMAP_ERROR;
-    }
-    swap_index <<= 3;
-    int i;
-    for (i = 0; i < 8; i++)
-    block_write (swap_block, swap_index + i, kaddr + BLOCK_SECTOR_SIZE * i);
-    swap_index >>= 3;
-
-    ASSERT (pg_ofs (kaddr) == 0);
-
-    sema_up(&swap_sema);
-    sema_up(&filesys_sema);
-
-    return swap_index + 1;
+	for (i = 0; i<SECTORS_PER_PAGE; i++)
+	{
+		block_read(swap_block, SECTORS_PER_PAGE*used_index + i, kaddr + i*BLOCK_SECTOR_SIZE);
+	}
+	lock_release(&swap_lock);
 }
 
 void swap_clear (size_t used_index)
 {
     if (used_index-- == 0)
         return;
-    sema_down (&swap_sema);
+    lock_acquire (&swap_lock);
     bitmap_set_multiple (swap_bitmap, used_index, 1, false);
-    sema_up(&swap_sema);
-}
+    lock_release (&swap_lock);
+    }

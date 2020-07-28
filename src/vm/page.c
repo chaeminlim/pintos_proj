@@ -10,6 +10,7 @@
 #include "userprog/pagedir.h"
 #include "lib/string.h"
 #include "vm/swap.h"
+#include <stdio.h>
 
 extern struct lock lru_lock;
 
@@ -26,7 +27,6 @@ struct page* allocate_page(enum palloc_flags flags, struct vm_area_struct* vma)
     page->kaddr = palloc_get_page(flags);
     while(page->kaddr == NULL)
     {
-        //free(page);
         swap_pages();
         page->kaddr = palloc_get_page(flags);
     }
@@ -79,6 +79,7 @@ bool delete_vma(struct mm_struct* mm_struct, struct vm_area_struct* vma)
 {
     if(!hash_delete(&mm_struct->vm_area_hash, &vma->elem)) return false;
     free_vaddr_page(vma->vaddr);
+    swap_clear (vma->swap_slot);
     free(vma);
     return true;
 }
@@ -100,6 +101,7 @@ void destroy_vma(struct hash_elem* e, void* aux UNUSED)
     ASSERT (e != NULL);
     struct vm_area_struct* vma = hash_entry(e, struct vm_area_struct, elem);
     free_vaddr_page(vma->vaddr);
+    swap_clear(vma->swap_slot);
     free(vma);
 }
 

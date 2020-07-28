@@ -122,7 +122,7 @@ syscall_handler (struct intr_frame *f)
     }
     case SYS_READ:
     {
-      is_safe_addr(f->esp + 12); 
+      is_safe_addr(f->esp + 12);
       is_safe_addr(f->esp + 8); 
       is_safe_addr(f->esp + 4); 
       unsigned int size = *(unsigned int*)(f->esp+12);
@@ -293,6 +293,7 @@ int read(int fd, void* buffer, unsigned size)
   if(reader_count == 1) sema_down(&writer_sema);
   sema_up(&mutex);
   //sema_down(&filesys_sema);
+  //printf("read!\n");
   struct thread* curr = thread_current();
   int ret;
   if(fd == 1) ret = -1;

@@ -106,7 +106,7 @@ sema_try_down (struct semaphore *sema)
 
    This function may be called from an interrupt handler. */
 void
-sema_up (struct semaphore *sema) 
+sema_up(struct semaphore *sema) 
 {
   enum intr_level old_level;
   int waiting_priority = -1;
@@ -123,10 +123,8 @@ sema_up (struct semaphore *sema)
     thread_unblock (waiting_thread);
   } 
   sema->value++;
+  thread_preempt();
   intr_set_level (old_level);
-
-  if( (waiting_priority != -1) && (waiting_priority > (thread_current()->curr_priority)))
-  { thread_yield(); } 
 }
 
 static void sema_test_helper (void *sema_);

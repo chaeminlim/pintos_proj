@@ -124,14 +124,14 @@ process_wait (tid_t child_tid)
   sema_down(&child->sema_wait);
   list_remove (&child->child_list_elem);
   exit_status = child->exit_code;
-  sema_up (&child->sema_exit);
+  sema_up(&child->sema_exit);
   return exit_status;
 }
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
-  struct thread *cur = thread_current ();
+  struct thread *cur = thread_current();
   uint32_t *pd;
 // clear fd
   int i = 0;
@@ -667,29 +667,25 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
     case PG_BINARY:
     case PG_FILE:
     {
-      if (!load_file (kpage->kaddr, vma) ||
-          !install_page (vma->vaddr, kpage->kaddr, !vma->read_only))
+      if (!load_file(kpage->kaddr, vma) 
+      || !install_page(vma->vaddr, kpage->kaddr, !vma->read_only))
         {
           NOT_REACHED();
         }
       vma->loaded = true;
-      
       lock_acquire(&lru_lock);
       add_page_lru(kpage);
       lock_release(&lru_lock);
-      
       return true;
     }
     case PG_ANON:
     {
-      swap_in (vma->swap_slot, kpage->kaddr);
-      ASSERT (pg_ofs (kpage->kaddr) == 0);
-      if (!install_page (vma->vaddr, kpage->kaddr, !vma->read_only))
-        {
-          NOT_REACHED ();
-          free_kaddr_page(kpage);
-          return false; 
-        }
+      swap_in(vma->swap_slot, kpage->kaddr);
+      ASSERT (pg_ofs(kpage->kaddr) == 0);
+      if (!install_page(vma->vaddr, kpage->kaddr, !vma->read_only))
+      {
+        NOT_REACHED ();
+      }
       vma->loaded = true;
       lock_acquire(&lru_lock);
       add_page_lru(kpage);
@@ -721,4 +717,40 @@ void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
   list_remove(&mmapstrt->mmap_elem);
   free(mmapstrt);
   sema_up(&writer_sema);
+}
+
+
+bool expand_stack(void* addr)
+{
+  struct page* kpage;
+  void* upage = pg_round_down(addr);
+  
+  struct vm_area_struct* vma = (struct vm_area_struct*) malloc(sizeof(struct vm_area_struct));
+  if(vma == NULL) return false;
+
+  kpage = allocate_page(PAL_USER | PAL_ZERO, vma);
+  if(kpage != NULL)
+  {
+    
+    memset (kpage->vma, 0, sizeof (struct vm_area_struct));
+    kpage->vma->type = PG_ANON;
+    kpage->vma->vaddr = upage;
+    kpage->vma->read_only = false;
+    kpage->vma->loaded = true;
+    if (!install_page(upage, kpage->kaddr, true))
+    {
+      free_kaddr_page(kpage);
+      free (vma);
+      return false;
+    }
+    lock_acquire(&lru_lock);
+    add_page_lru(kpage);
+    lock_release(&lru_lock);
+  }
+  else 
+  {
+    free(vma);
+    return false;
+  }
+  return true;
 }

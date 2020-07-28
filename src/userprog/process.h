@@ -13,4 +13,5 @@ void process_activate (void);
 bool allocate_vm_page_mm(struct vm_area_struct* vma);
 bool load_file (void *kaddr, struct vm_area_struct *vma);
 void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt);
+bool expand_stack(void* addr);
 #endif /* userprog/process.h */
