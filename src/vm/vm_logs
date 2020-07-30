@@ -1,3 +1,8 @@
+gcc -m32 -c ../../userprog/process.c -o userprog/process.o -g -msoft-float -O -march=i686 -fno-stack-protector -nostdinc -I../.. -I../../lib -I../../lib/kernel -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers -DUSERPROG -DFILESYS -DVM -MMD -MF userprog/process.d
+gcc -m32 -c ../../userprog/syscall.c -o userprog/syscall.o -g -msoft-float -O -march=i686 -fno-stack-protector -nostdinc -I../.. -I../../lib -I../../lib/kernel -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers -DUSERPROG -DFILESYS -DVM -MMD -MF userprog/syscall.d
+gcc -m32 -c ../../vm/swap.c -o vm/swap.o -g -msoft-float -O -march=i686 -fno-stack-protector -nostdinc -I../.. -I../../lib -I../../lib/kernel -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers -DUSERPROG -DFILESYS -DVM -MMD -MF vm/swap.d
+ld -melf_i386 -T threads/kernel.lds.s -o kernel.o threads/start.o threads/init.o threads/thread.o threads/switch.o threads/interrupt.o threads/intr-stubs.o threads/synch.o threads/palloc.o threads/malloc.o threads/fixed_point.o devices/pit.o devices/timer.o devices/kbd.o devices/vga.o devices/serial.o devices/block.o devices/partition.o devices/ide.o devices/input.o devices/intq.o devices/rtc.o devices/shutdown.o devices/speaker.o lib/debug.o lib/random.o lib/stdio.o lib/stdlib.o lib/string.o lib/arithmetic.o lib/ustar.o lib/kernel/debug.o lib/kernel/list.o lib/kernel/bitmap.o lib/kernel/hash.o lib/kernel/console.o userprog/process.o userprog/pagedir.o userprog/exception.o userprog/syscall.o userprog/gdt.o userprog/tss.o filesys/filesys.o filesys/free-map.o filesys/file.o filesys/directory.o filesys/inode.o filesys/fsutil.o vm/page.o vm/swap.o
+objcopy -R .note -R .comment -S kernel.o kernel.bin
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/args-none -a args-none --swap-size=4 -- -q  -f run args-none < /dev/null 2> tests/userprog/args-none.errors > tests/userprog/args-none.output
 perl -I../.. ../../tests/userprog/args-none.ck tests/userprog/args-none tests/userprog/args-none.result
 pass tests/userprog/args-none
@@ -198,50 +203,16 @@ perl -I../.. ../../tests/userprog/bad-jump2.ck tests/userprog/bad-jump2 tests/us
 pass tests/userprog/bad-jump2
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/pt-grow-stack -a pt-grow-stack --swap-size=4 -- -q  -f run pt-grow-stack < /dev/null 2> tests/vm/pt-grow-stack.errors > tests/vm/pt-grow-stack.output
 perl -I../.. ../../tests/vm/pt-grow-stack.ck tests/vm/pt-grow-stack tests/vm/pt-grow-stack.result
-FAIL tests/vm/pt-grow-stack
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (pt-grow-stack) begin
-  (pt-grow-stack) cksum: 3424492700
-  (pt-grow-stack) end
-Differences in `diff -u' format:
-  (pt-grow-stack) begin
-- (pt-grow-stack) cksum: 3424492700
-- (pt-grow-stack) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/pt-grow-stack
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/pt-grow-pusha -a pt-grow-pusha --swap-size=4 -- -q  -f run pt-grow-pusha < /dev/null 2> tests/vm/pt-grow-pusha.errors > tests/vm/pt-grow-pusha.output
 perl -I../.. ../../tests/vm/pt-grow-pusha.ck tests/vm/pt-grow-pusha tests/vm/pt-grow-pusha.result
-FAIL tests/vm/pt-grow-pusha
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (pt-grow-pusha) begin
-  (pt-grow-pusha) end
-Differences in `diff -u' format:
-  (pt-grow-pusha) begin
-- (pt-grow-pusha) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/pt-grow-pusha
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/pt-grow-bad -a pt-grow-bad --swap-size=4 -- -q  -f run pt-grow-bad < /dev/null 2> tests/vm/pt-grow-bad.errors > tests/vm/pt-grow-bad.output
 perl -I../.. ../../tests/vm/pt-grow-bad.ck tests/vm/pt-grow-bad tests/vm/pt-grow-bad.result
 pass tests/vm/pt-grow-bad
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/pt-big-stk-obj -a pt-big-stk-obj --swap-size=4 -- -q  -f run pt-big-stk-obj < /dev/null 2> tests/vm/pt-big-stk-obj.errors > tests/vm/pt-big-stk-obj.output
 perl -I../.. ../../tests/vm/pt-big-stk-obj.ck tests/vm/pt-big-stk-obj tests/vm/pt-big-stk-obj.result
-FAIL tests/vm/pt-big-stk-obj
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (pt-big-stk-obj) begin
-  (pt-big-stk-obj) cksum: 3256410166
-  (pt-big-stk-obj) end
-Differences in `diff -u' format:
-  (pt-big-stk-obj) begin
-- (pt-big-stk-obj) cksum: 3256410166
-- (pt-big-stk-obj) end
-
-(Process exit codes are excluded for matching purposes.)
+pass tests/vm/pt-big-stk-obj
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/pt-bad-addr -a pt-bad-addr --swap-size=4 -- -q  -f run pt-bad-addr < /dev/null 2> tests/vm/pt-bad-addr.errors > tests/vm/pt-bad-addr.output
 perl -I../.. ../../tests/vm/pt-bad-addr.ck tests/vm/pt-bad-addr tests/vm/pt-bad-addr.result
 pass tests/vm/pt-bad-addr
@@ -270,11 +241,11 @@ Acceptable output:
   (pt-grow-stk-sc) end
 Differences in `diff -u' format:
   (pt-grow-stk-sc) begin
-- (pt-grow-stk-sc) create "sample.txt"
-- (pt-grow-stk-sc) open "sample.txt"
-- (pt-grow-stk-sc) write "sample.txt"
-- (pt-grow-stk-sc) 2nd open "sample.txt"
-- (pt-grow-stk-sc) read "sample.txt"
+  (pt-grow-stk-sc) create "sample.txt"
+  (pt-grow-stk-sc) open "sample.txt"
+  (pt-grow-stk-sc) write "sample.txt"
+  (pt-grow-stk-sc) 2nd open "sample.txt"
+  (pt-grow-stk-sc) read "sample.txt"
 - (pt-grow-stk-sc) compare written data against read data
 - (pt-grow-stk-sc) end
 
@@ -302,11 +273,7 @@ run: wait for child 0: FAILED
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/page-merge-stk -a page-merge-stk -p tests/vm/child-qsort -a child-qsort --swap-size=4 -- -q  -f run page-merge-stk < /dev/null 2> tests/vm/page-merge-stk.errors > tests/vm/page-merge-stk.output
 perl -I../.. ../../tests/vm/page-merge-stk.ck tests/vm/page-merge-stk tests/vm/page-merge-stk.result
 FAIL tests/vm/page-merge-stk
-Kernel panic in run: PANIC at ../../lib/kernel/list.c:282 in list_front(): assertion `!list_empty (list)' failed.
-Call stack: 0xc002a926 0x6f72665fc
-Translation of call stack:
-0xc002a926: debug_panic (.../../lib/kernel/debug.c:38)
-0x6f72665fc: (unknown)
+run: wait for child 0: FAILED
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/page-merge-mm -a page-merge-mm -p tests/vm/child-qsort-mm -a child-qsort-mm --swap-size=4 -- -q  -f run page-merge-mm < /dev/null 2> tests/vm/page-merge-mm.errors > tests/vm/page-merge-mm.output
 perl -I../.. ../../tests/vm/page-merge-mm.ck tests/vm/page-merge-mm tests/vm/page-merge-mm.result
 FAIL tests/vm/page-merge-mm
@@ -473,10 +440,10 @@ pass tests/userprog/bad-read2
 pass tests/userprog/bad-write2
 pass tests/userprog/bad-jump
 pass tests/userprog/bad-jump2
-FAIL tests/vm/pt-grow-stack
-FAIL tests/vm/pt-grow-pusha
+pass tests/vm/pt-grow-stack
+pass tests/vm/pt-grow-pusha
 pass tests/vm/pt-grow-bad
-FAIL tests/vm/pt-big-stk-obj
+pass tests/vm/pt-big-stk-obj
 pass tests/vm/pt-bad-addr
 pass tests/vm/pt-bad-read
 pass tests/vm/pt-write-code
@@ -520,5 +487,5 @@ pass tests/filesys/base/sm-seq-random
 pass tests/filesys/base/syn-read
 pass tests/filesys/base/syn-remove
 pass tests/filesys/base/syn-write
-9 of 113 tests failed.
+6 of 113 tests failed.
 ../../tests/Make.tests:26: recipe for target 'check' failed

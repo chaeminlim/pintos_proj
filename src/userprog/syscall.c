@@ -15,6 +15,7 @@
 #include "userprog/pagedir.h"
 #include "vm/page.h"
 #include <string.h>
+#include "vm/frame.h"
 
 static void syscall_handler (struct intr_frame *);
 tid_t exec(const char* cmd_line);

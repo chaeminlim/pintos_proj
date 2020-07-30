@@ -21,7 +21,7 @@
 #include "userprog/syscall.h"
 #include "vm/page.h"
 #include "vm/swap.h"
-
+#include "vm/frame.h"
 extern struct semaphore filesys_sema;
 extern struct lock lru_lock;
 extern struct semaphore writer_sema;
