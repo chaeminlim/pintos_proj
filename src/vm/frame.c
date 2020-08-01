@@ -101,9 +101,9 @@ void swap_pages()
             NOT_REACHED ();
     }
     victim->vma->loaded = false;
+    pagedir_clear_page(thread_current()->pagedir,victim->vma->vaddr);
     lock_release(&lru_lock);
     free_kaddr_page(victim->kaddr);
-    
 }
 
 struct list_elem * get_next_lru_clock (void)

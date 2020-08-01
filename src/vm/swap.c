@@ -1,5 +1,6 @@
 #include "vm/swap.h"
 #include "vm/page.h"
+#include "vm/frame.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "userprog/pagedir.h"
@@ -19,52 +20,63 @@ struct block *swap_block;
 void swap_init(void)
 {
 	swap_block = block_get_role (BLOCK_SWAP);
-	swap_bitmap = bitmap_create(BLOCK_SECTOR_SIZE*block_size(swap_block)/PGSIZE);
-	bitmap_set_all (swap_bitmap, 0);
+	if(swap_block == NULL) NOT_REACHED ();
+	size_t swap_size = block_size(swap_block) / (PGSIZE / BLOCK_SECTOR_SIZE);
+	swap_bitmap = bitmap_create(swap_size);
+	bitmap_set_all (swap_bitmap, true);
 	lock_init(&swap_lock);
 }
 
 size_t swap_out(struct page* page)
 {
     int i;
-	size_t empty_slot_index;
     lock_acquire(&swap_lock);
 	
-    empty_slot_index = bitmap_scan_and_flip(swap_bitmap, 0, 1, 0);
+    size_t swap_index = bitmap_scan(swap_bitmap, 0, 1, true);
 
 	for (i = 0; i<SECTORS_PER_PAGE; i++)
 	{
-		block_write(swap_block, SECTORS_PER_PAGE*empty_slot_index + i, page->kaddr + i*BLOCK_SECTOR_SIZE);
+		block_write(swap_block, 
+		SECTORS_PER_PAGE*swap_index + i, 
+		page->kaddr + (i*BLOCK_SECTOR_SIZE));
 	}
-	page->vma->swap_slot = empty_slot_index;
+	page->vma->swap_slot = swap_index;
+	bitmap_set(swap_bitmap, swap_index, false);
 	lock_release(&swap_lock);
-	return empty_slot_index;
+	return swap_index;
 }
 
-void swap_in(size_t used_index, void* kaddr)
+void swap_in(size_t swap_index, void* kaddr)
 {
-
     lock_acquire(&swap_lock);
-	int i;
 
-    if (bitmap_test(swap_bitmap, used_index) == 0)
+    if (bitmap_test(swap_bitmap, swap_index) == true)
 	{
-		return;
+		NOT_REACHED();
 	}
-	bitmap_flip(swap_bitmap, used_index);
-
-	for (i = 0; i<SECTORS_PER_PAGE; i++)
+	size_t i;
+	for (i = 0; i < SECTORS_PER_PAGE; i++) 
 	{
-		block_read(swap_block, SECTORS_PER_PAGE*used_index + i, kaddr + i*BLOCK_SECTOR_SIZE);
+		block_read (swap_block,
+		swap_index * SECTORS_PER_PAGE + i,
+		kaddr + (BLOCK_SECTOR_SIZE * i)
+		);
 	}
+	bitmap_set(swap_bitmap, swap_index, true);
+	
 	lock_release(&swap_lock);
 }
 
-void swap_clear (size_t used_index)
+void swap_clear (size_t swap_index)
 {
-    if (used_index-- == 0)
-        return;
-    lock_acquire (&swap_lock);
-    bitmap_set_multiple (swap_bitmap, used_index, 1, false);
+    lock_acquire(&swap_lock);
+    
+	if (bitmap_test(swap_bitmap, swap_index) == true) 
+	{
+	}
+	else
+	{
+		bitmap_set(swap_bitmap, swap_index, true);
+	}
     lock_release (&swap_lock);
-    }
+}

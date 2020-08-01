@@ -123,6 +123,7 @@ void free_kaddr_page(void* kaddr)
         pagedir_clear_page (page->thread->pagedir, page->vma->vaddr);
         delete_page_lru(page);
         palloc_free_page(page->kaddr);
+        //delete_vma(&thread_current()->mm_struct, page->vma);
         free(page);
     }
     lock_release(&lru_lock);

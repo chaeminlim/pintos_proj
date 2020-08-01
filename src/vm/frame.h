@@ -3,7 +3,6 @@
 
 #include "vm/page.h"
 
-#define SECTORS_PER_PAGE (PGSIZE/BLOCK_SECTOR_SIZE)
 void init_lru_list(void);
 void add_page_lru(struct page*);
 void delete_page_lru(struct page*);

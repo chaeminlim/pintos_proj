@@ -288,7 +288,6 @@ int open(char *file)
 
 int read(int fd, void* buffer, unsigned size)
 {
-  
   sema_down(&mutex);
   reader_count++;
   if(reader_count == 1) sema_down(&writer_sema);
@@ -368,24 +367,23 @@ void is_buffer_safe(void* buffer, unsigned size)
   void* temp_buffer = buffer;
   is_safe_addr(buffer); 
   is_safe_addr((void*)((unsigned)buffer + size)); 
-  void* vaddr;
   void* vaddr_last = pg_round_down((void*)((unsigned)buffer + size));
   struct vm_area_struct* vma;
 
   while(1)
   {
-    vaddr = pg_round_down(temp_buffer);
-    vma = get_vma_with_vaddr(&thread_current()->mm_struct, vaddr);
+    temp_buffer = pg_round_down(temp_buffer);
+    vma = get_vma_with_vaddr(&thread_current()->mm_struct, temp_buffer);
     if(vma == NULL) exit(-1);
     if(vma->read_only) exit(-1);
-    if(vaddr == vaddr_last) break;
+    if(temp_buffer == vaddr_last) break;
     else temp_buffer += PGSIZE;
   }
 }
 
 void is_string_safe(char* str)
 {
-  size_t size = strlen((char*)str) + 1;
+  size_t size = strlen((char*)str);
   void* temp_buffer = (void*)str;
   is_safe_addr(temp_buffer);
   is_safe_addr((void*)((size_t)temp_buffer + size));
@@ -396,8 +394,7 @@ void is_string_safe(char* str)
   while(1)
   {
     vaddr = pg_round_down(temp_buffer);
-    vma = get_vma_with_vaddr(
-      &thread_current()->mm_struct, vaddr);
+    vma = get_vma_with_vaddr(&thread_current()->mm_struct, vaddr);
     if(vma == NULL) exit(-1);
     if(vaddr == vaddr_last) break;
     else temp_buffer += PGSIZE;
@@ -448,6 +445,7 @@ mapid_t mmap(int fd, void *addr)
       list_push_back(&mmap_strt->vma_list, &vma->mmap_elem);
       insert_vma(&thread_current()->mm_struct, vma);
       
+      //printf("addr %0x\n", (uint32_t)addr);
       addr += PGSIZE;
       offset += PGSIZE;
       file_len -= PGSIZE;

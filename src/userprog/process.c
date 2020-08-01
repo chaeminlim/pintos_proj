@@ -524,7 +524,7 @@ setup_stack (void **esp, const char* cmd_line)
   lock_acquire(&lru_lock);
   add_page_lru(kpage);
   lock_release(&lru_lock);
-
+  
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
@@ -612,7 +612,11 @@ setup_stack (void **esp, const char* cmd_line)
        
       }
       else
-        free_kaddr_page(kpage->kaddr);
+        {
+          NOT_REACHED();
+          free_kaddr_page(kpage->kaddr);
+        }
+        
     }
   return success;
 }
@@ -668,33 +672,31 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
     case PG_FILE:
     {
       if (!load_file(kpage->kaddr, vma) 
-      || !install_page(vma->vaddr, kpage->kaddr, !vma->read_only))
+      || !install_page(kpage->vma->vaddr, kpage->kaddr, !kpage->vma->read_only))
         {
           NOT_REACHED();
         }
-      vma->loaded = true;
-      lock_acquire(&lru_lock);
-      add_page_lru(kpage);
-      lock_release(&lru_lock);
-      return true;
+      kpage->vma->loaded = true;
+      break;
     }
     case PG_ANON:
     {
       swap_in(vma->swap_slot, kpage->kaddr);
       ASSERT (pg_ofs(kpage->kaddr) == 0);
-      if (!install_page(vma->vaddr, kpage->kaddr, !vma->read_only))
+      if (!install_page(kpage->vma->vaddr, kpage->kaddr, !kpage->vma->read_only))
       {
         NOT_REACHED ();
       }
-      vma->loaded = true;
-      lock_acquire(&lru_lock);
-      add_page_lru(kpage);
-      lock_release(&lru_lock);
-      return true;
+      kpage->vma->loaded = true;
+      break;
     }
     default:
         NOT_REACHED();
   }
+  lock_acquire(&lru_lock);
+  add_page_lru(kpage);
+  lock_release(&lru_lock);
+  return true;
 }
 
 void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
@@ -722,35 +724,44 @@ void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
 
 bool expand_stack(void* addr)
 {
-  struct page* kpage;
+  void* temp_addr = PHYS_BASE -PGSIZE;
   void* upage = pg_round_down(addr);
   
-  struct vm_area_struct* vma = (struct vm_area_struct*) malloc(sizeof(struct vm_area_struct));
-  if(vma == NULL) return false;
-
-  kpage = allocate_page(PAL_USER | PAL_ZERO, vma);
-  if(kpage != NULL)
+  for(; temp_addr >= upage; temp_addr -= PGSIZE)
   {
-    
-    memset (kpage->vma, 0, sizeof (struct vm_area_struct));
-    kpage->vma->type = PG_ANON;
-    kpage->vma->vaddr = upage;
-    kpage->vma->read_only = false;
-    kpage->vma->loaded = true;
-    if (!install_page(upage, kpage->kaddr, true))
-    {
-      free_kaddr_page(kpage);
-      free (vma);
-      return false;
+    if(!get_vma_with_vaddr(&thread_current()->mm_struct, temp_addr))
+    {// vma가 존재하지 않는다면,
+      struct page* kpage;
+      struct vm_area_struct* vma = (struct vm_area_struct*) malloc(sizeof(struct vm_area_struct));
+      if(vma == NULL) NOT_REACHED();
+      kpage = allocate_page(PAL_USER | PAL_ZERO, vma);
+      if(kpage != NULL)
+      {
+        memset (kpage->vma, 0, sizeof (struct vm_area_struct));
+        kpage->vma->type = PG_ANON;
+        kpage->vma->vaddr = temp_addr;
+        kpage->vma->read_only = false;
+        kpage->vma->loaded = true;
+        insert_vma(&thread_current()->mm_struct, kpage->vma);
+        if (!install_page(temp_addr, kpage->kaddr, true))
+        {
+          NOT_REACHED();
+          free_kaddr_page(kpage);
+          free (vma);
+          return false;
+        }
+        lock_acquire(&lru_lock);
+        add_page_lru(kpage);
+        lock_release(&lru_lock);
+      }
+      else 
+      {
+        NOT_REACHED();
+      }
     }
-    lock_acquire(&lru_lock);
-    add_page_lru(kpage);
-    lock_release(&lru_lock);
   }
-  else 
-  {
-    free(vma);
-    return false;
-  }
+
+
+  
   return true;
 }
