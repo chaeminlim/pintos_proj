@@ -69,7 +69,7 @@ start_process (void *file_name_)
   struct intr_frame if_;
 
   // vm initialization
-  init_vm(&t->mm_struct.vm_area_hash);
+  init_vm(&t->mm_struct->vm_area_hash);
 
 /* Initialize interrupt frame and load executable. */  
   memset (&if_, 0, sizeof if_);
@@ -142,7 +142,7 @@ process_exit (void)
   //palloc_free_page (cur->fd_table);
   
   int mapid = 0;
-  for(; mapid < cur->mm_struct.next_mapid; mapid++)
+  for(; mapid < cur->mm_struct->next_mapid; mapid++)
   {
     
     struct mmap_struct *mmstrt = find_mmap_struct(mapid);
@@ -155,7 +155,8 @@ process_exit (void)
   #endif
   free(cur->fd_table);
   // clear vm
-  free_vm(&cur->mm_struct);
+  free_vm(cur->mm_struct);
+  free(cur->mm_struct);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -501,7 +502,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       vma->type = PG_BINARY;
       vma->read_only = !writable;
       vma->loaded = false;
-      insert_vma(&thread_current()->mm_struct, vma);
+      insert_vma(thread_current()->mm_struct, vma);
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
@@ -539,7 +540,7 @@ setup_stack (void **esp, const char* cmd_line)
         vma->type = PG_ANON;
         vma->read_only = false;
         kpage->vma = vma;
-        insert_vma(&thread_current()->mm_struct, vma);
+        insert_vma(thread_current()->mm_struct, vma);
         
         
         *esp = PHYS_BASE;
@@ -714,7 +715,7 @@ void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
     }
     vma->loaded = false;
     e = list_remove(e);
-    delete_vma(&curr->mm_struct, vma); 
+    delete_vma(curr->mm_struct, vma); 
   }
   list_remove(&mmapstrt->mmap_elem);
   free(mmapstrt);
@@ -729,7 +730,7 @@ bool expand_stack(void* addr)
   
   for(; temp_addr >= upage; temp_addr -= PGSIZE)
   {
-    if(!get_vma_with_vaddr(&thread_current()->mm_struct, temp_addr))
+    if(!get_vma_with_vaddr(thread_current()->mm_struct, temp_addr))
     {// vma가 존재하지 않는다면,
       struct page* kpage;
       struct vm_area_struct* vma = (struct vm_area_struct*) malloc(sizeof(struct vm_area_struct));
@@ -742,7 +743,7 @@ bool expand_stack(void* addr)
         kpage->vma->vaddr = temp_addr;
         kpage->vma->read_only = false;
         kpage->vma->loaded = true;
-        insert_vma(&thread_current()->mm_struct, kpage->vma);
+        insert_vma(thread_current()->mm_struct, kpage->vma);
         if (!install_page(temp_addr, kpage->kaddr, true))
         {
           NOT_REACHED();

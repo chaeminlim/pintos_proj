@@ -152,7 +152,7 @@ page_fault (struct intr_frame *f)
    bool flag = false;
    if (not_present)
    {
-      struct vm_area_struct* vma = get_vma_with_vaddr(&thread_current()->mm_struct, fault_addr);
+      struct vm_area_struct* vma = get_vma_with_vaddr(thread_current()->mm_struct, fault_addr);
       if(vma != NULL)
       {
          flag = allocate_vm_page_mm(vma);

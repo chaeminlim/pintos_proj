@@ -38,8 +38,8 @@ struct page* allocate_page(enum palloc_flags flags, struct vm_area_struct* vma)
 struct mmap_struct* find_mmap_struct(mapid_t mapping)
 {
     struct list_elem *e;
-    for (e = list_begin (&thread_current ()->mm_struct.mmap_list);
-        e != list_end (&thread_current ()->mm_struct.mmap_list);
+    for (e = list_begin (&thread_current ()->mm_struct->mmap_list);
+        e != list_end (&thread_current ()->mm_struct->mmap_list);
         e = list_next (e))
         {
         struct mmap_struct *f = list_entry (e, struct mmap_struct, mmap_elem);
@@ -136,8 +136,8 @@ void free_vm(struct mm_struct* mm)
 
 mapid_t allocate_mapid()
 {
-    mapid_t ret = thread_current()->mm_struct.next_mapid;
-    thread_current()->mm_struct.next_mapid += 1;
+    mapid_t ret = thread_current()->mm_struct->next_mapid;
+    thread_current()->mm_struct->next_mapid += 1;
     return ret;
 }
 

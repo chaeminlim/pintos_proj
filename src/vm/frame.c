@@ -101,7 +101,6 @@ void swap_pages()
             NOT_REACHED ();
     }
     victim->vma->loaded = false;
-    pagedir_clear_page(thread_current()->pagedir,victim->vma->vaddr);
     lock_release(&lru_lock);
     free_kaddr_page(victim->kaddr);
 }
@@ -128,7 +127,7 @@ struct page* get_victim (void)
     e = get_next_lru_clock();
     ASSERT (e != NULL);
     page = list_entry (e, struct page, lru_elem);
-
+    ASSERT(page);
     while (pagedir_is_accessed (page->thread->pagedir, page->vma->vaddr))
     {
         pagedir_set_accessed (page->thread->pagedir, page->vma->vaddr, false);

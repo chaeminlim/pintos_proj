@@ -103,8 +103,6 @@ syscall_handler (struct intr_frame *f)
       is_string_safe(file);
       f->eax = remove(file);
       break;
-
-
     }
     case SYS_OPEN:
     {
@@ -373,7 +371,7 @@ void is_buffer_safe(void* buffer, unsigned size)
   while(1)
   {
     temp_buffer = pg_round_down(temp_buffer);
-    vma = get_vma_with_vaddr(&thread_current()->mm_struct, temp_buffer);
+    vma = get_vma_with_vaddr(thread_current()->mm_struct, temp_buffer);
     if(vma == NULL) exit(-1);
     if(vma->read_only) exit(-1);
     if(temp_buffer == vaddr_last) break;
@@ -394,13 +392,12 @@ void is_string_safe(char* str)
   while(1)
   {
     vaddr = pg_round_down(temp_buffer);
-    vma = get_vma_with_vaddr(&thread_current()->mm_struct, vaddr);
+    vma = get_vma_with_vaddr(thread_current()->mm_struct, vaddr);
     if(vma == NULL) exit(-1);
     if(vaddr == vaddr_last) break;
     else temp_buffer += PGSIZE;
   }
 }
-
 // for memory mapped file
 // return -1 if fails
 mapid_t mmap(int fd, void *addr)
@@ -425,13 +422,13 @@ mapid_t mmap(int fd, void *addr)
     list_init(&mmap_strt->vma_list);
     mmap_strt->file = file_reopened;
     mmap_strt->mapid = allocate_mapid();
-    list_push_back(&thread_current()->mm_struct.mmap_list, &mmap_strt->mmap_elem);
+    list_push_back(&thread_current()->mm_struct->mmap_list, &mmap_strt->mmap_elem);
     off_t file_len = file_length(mmap_strt->file);
     size_t offset = 0;
     for(; file_len > 0;)
     {
       // 기존에 존재하는 vma라면
-      if(get_vma_with_vaddr(&thread_current()->mm_struct, addr)) { return -1; }
+      if(get_vma_with_vaddr(thread_current()->mm_struct, addr)) { return -1; }
       struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof (struct vm_area_struct));
       memset (vma, 0, sizeof(struct vm_area_struct));
       vma->type = PG_FILE;
@@ -443,7 +440,7 @@ mapid_t mmap(int fd, void *addr)
       vma->file = mmap_strt->file;
       vma->loaded = false;
       list_push_back(&mmap_strt->vma_list, &vma->mmap_elem);
-      insert_vma(&thread_current()->mm_struct, vma);
+      insert_vma(thread_current()->mm_struct, vma);
       
       //printf("addr %0x\n", (uint32_t)addr);
       addr += PGSIZE;

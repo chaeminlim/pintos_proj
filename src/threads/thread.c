@@ -194,7 +194,10 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-
+  t->parent = curr;
+  list_push_back(&curr->child_list, &t->child_list_elem);
+  #ifdef USERPROG
+  
   //t->fd_table = palloc_get_page (PAL_ZERO);
   t->fd_table = malloc ( sizeof(struct file*)*128);
   
@@ -205,9 +208,11 @@ thread_create (const char *name, int priority,
   } 
   int i = 0;
   for(; i < 128; i++) t->fd_table[i] = NULL;
-  // set parent
-  t->parent = curr;
-  list_push_back(&curr->child_list, &t->child_list_elem);
+
+  t->mm_struct = malloc(sizeof(struct mm_struct));
+  list_init(&t->mm_struct->mmap_list);
+  t->mm_struct->next_mapid = 0;
+  #endif
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
@@ -320,22 +325,23 @@ thread_exit (void)
   struct list_elem *child;
   ASSERT (!intr_context ());
 
-#ifdef USERPROG
+  #ifdef USERPROG
   process_exit ();
-#endif
-for (child = list_begin (&thread_current ()->child_list);
-       child != list_end (&thread_current ()->child_list); )
+  #endif
+
+  ASSERT(thread_current());
+  
+  for (child = list_begin (&thread_current()->child_list);
+        child != list_end (&thread_current()->child_list); )
   {
     struct thread *t = list_entry (child, struct thread, child_list_elem);
     child = list_remove (child);
     sema_up (&t->sema_exit);
   }
+  
   sema_up(&thread_current()->sema_wait);
-  
   sema_down(&thread_current()->sema_exit);
-  
-  
-  
+
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
@@ -531,6 +537,8 @@ running_thread (void)
 static bool
 is_thread (struct thread *t)
 {
+  ASSERT(t != NULL);
+  ASSERT(t->magic == THREAD_MAGIC);
   return t != NULL && t->magic == THREAD_MAGIC;
 }
 
@@ -562,13 +570,10 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->sema_wait, 0);
   sema_init(&t->sema_load, 0);
   t->load_status = false;
-  t->executing_file = NULL;
-  // vm
-  list_init(&t->mm_struct.mmap_list);
-  t->mm_struct.next_mapid = 0;
-  #ifdef USERPROG
-  // file descriptor init
   
+  // vm
+  #ifdef USERPROG
+  t->executing_file = NULL;
 
   #endif
 }
@@ -840,14 +845,16 @@ void thread_preempt (void)
   old_level = intr_disable ();
 
   // 대기 리스트가 비어 있으면 이 스레드를 제외하고 idle 스레드 하나 뿐입니다.
-  if (!list_empty (&ready_list) &&
-      thread_current ()->curr_priority
+  
+  if (!list_empty (&ready_list))
+  {
+    if(thread_current ()->curr_priority
       < list_entry (list_front (&ready_list), struct thread, elem)->curr_priority)
-    {
-      // 리스트의 첫 번째 스레드가 이 스레드보다 우선 실행되어야 하므로, 스케줄 반납합니다.
-      intr_set_level (old_level);
-      thread_yield ();
-    }
+      {
+          intr_set_level (old_level);
+          thread_yield ();
+      }
+  }
   intr_set_level (old_level);
 }
 

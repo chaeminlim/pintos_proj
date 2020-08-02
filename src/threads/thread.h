@@ -125,21 +125,19 @@ struct thread
     // user prog
     struct list child_list;
     struct list_elem child_list_elem;
-    struct semaphore sema_wait;
-    struct semaphore sema_exit;
-    struct semaphore sema_load;
     struct thread* parent;
     bool load_status;
     int exit_code;
-    struct file** fd_table;
-    //struct file* fd_table[128];
-    struct file* executing_file;
     // vm
-    struct mm_struct mm_struct;
+    struct mm_struct* mm_struct;
+    struct semaphore sema_wait;
+    struct semaphore sema_exit;
+    struct semaphore sema_load;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    
+    struct file** fd_table;
+    struct file* executing_file;
 #endif
 
     /* Owned by thread.c. */
