@@ -502,6 +502,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       vma->type = PG_BINARY;
       vma->read_only = !writable;
       vma->loaded = false;
+      vma->swap_slot = 0xFFFFFFFF;
       insert_vma(thread_current()->mm_struct, vma);
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -732,37 +733,35 @@ bool expand_stack(void* addr)
   {
     if(!get_vma_with_vaddr(thread_current()->mm_struct, temp_addr))
     {// vma가 존재하지 않는다면,
-      struct page* kpage;
       struct vm_area_struct* vma = (struct vm_area_struct*) malloc(sizeof(struct vm_area_struct));
       if(vma == NULL) NOT_REACHED();
-      kpage = allocate_page(PAL_USER | PAL_ZERO, vma);
-      if(kpage != NULL)
-      {
-        memset (kpage->vma, 0, sizeof (struct vm_area_struct));
-        kpage->vma->type = PG_ANON;
-        kpage->vma->vaddr = temp_addr;
-        kpage->vma->read_only = false;
-        kpage->vma->loaded = true;
-        insert_vma(thread_current()->mm_struct, kpage->vma);
-        if (!install_page(temp_addr, kpage->kaddr, true))
-        {
-          NOT_REACHED();
-          free_kaddr_page(kpage);
-          free (vma);
-          return false;
-        }
-        lock_acquire(&lru_lock);
-        add_page_lru(kpage);
-        lock_release(&lru_lock);
-      }
-      else 
-      {
-        NOT_REACHED();
-      }
+      vma->type = PG_ANON;
+      vma->vaddr = temp_addr;
+      vma->read_only = false;
+      vma->loaded = true;
+      vma->swap_slot = 0xFFFFFFFF;
+      insert_vma(thread_current()->mm_struct, vma);
     }
   }
 
+  struct page* kpage = NULL;
+  struct vm_area_struct* vvma = get_vma_with_vaddr(thread_current()->mm_struct, upage);
+  kpage = allocate_page(PAL_USER | PAL_ZERO, vvma);
+  if(kpage != NULL)
+  {
+    if (!install_page(temp_addr, kpage->kaddr, true))
+    {
+      NOT_REACHED();
+      free_kaddr_page(kpage);
+      free (vvma);
+      return false;
+    }
+    lock_acquire(&lru_lock);
+    add_page_lru(kpage);
+    lock_release(&lru_lock);
+  }
+  else
+    NOT_REACHED();
 
-  
   return true;
 }

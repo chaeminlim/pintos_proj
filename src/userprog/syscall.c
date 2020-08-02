@@ -439,6 +439,7 @@ mapid_t mmap(int fd, void *addr)
       vma->zero_bytes = PGSIZE - vma->read_bytes;
       vma->file = mmap_strt->file;
       vma->loaded = false;
+      vma->swap_slot = 0xFFFFFFFF;
       list_push_back(&mmap_strt->vma_list, &vma->mmap_elem);
       insert_vma(thread_current()->mm_struct, vma);
       

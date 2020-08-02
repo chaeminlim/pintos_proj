@@ -163,6 +163,10 @@ page_fault (struct intr_frame *f)
          {
             flag = expand_stack(fault_addr);
          }
+         else
+         {
+            //printf("Not allowed stack! %0x\n", fault_addr);
+         }
       }
    }
 

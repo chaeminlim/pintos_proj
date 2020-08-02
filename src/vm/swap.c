@@ -30,6 +30,7 @@ void swap_init(void)
 size_t swap_out(struct page* page)
 {
     int i;
+	ASSERT(!lock_held_by_current_thread(&swap_lock));
     lock_acquire(&swap_lock);
 	
     size_t swap_index = bitmap_scan(swap_bitmap, 0, 1, true);
@@ -48,8 +49,14 @@ size_t swap_out(struct page* page)
 
 void swap_in(size_t swap_index, void* kaddr)
 {
+	ASSERT(!lock_held_by_current_thread(&swap_lock));
     lock_acquire(&swap_lock);
 
+	if(swap_index == 0xFFFFFFFF)
+	{
+		lock_release(&swap_lock);
+		return;
+	}
     if (bitmap_test(swap_bitmap, swap_index) == true)
 	{
 		NOT_REACHED();
@@ -69,8 +76,13 @@ void swap_in(size_t swap_index, void* kaddr)
 
 void swap_clear (size_t swap_index)
 {
+	ASSERT(!lock_held_by_current_thread(&swap_lock));
     lock_acquire(&swap_lock);
-    
+    if(swap_index == 0xFFFFFFFF)
+	{
+		lock_release(&swap_lock);
+		return;
+	}
 	if (bitmap_test(swap_bitmap, swap_index) == true) 
 	{
 	}
