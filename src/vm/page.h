@@ -28,6 +28,7 @@ struct vm_area_struct
 {
     bool loaded;
     bool read_only;
+    bool pinned;
     enum PG_TYPE type;
     struct file* file;
     void* vaddr;

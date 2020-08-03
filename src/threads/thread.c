@@ -324,23 +324,23 @@ thread_exit (void)
 {
   struct list_elem *child;
   ASSERT (!intr_context ());
-
   #ifdef USERPROG
   process_exit ();
   #endif
-
-  
-  for (child = list_begin (&thread_current()->child_list);
-        child != list_end (&thread_current()->child_list); )
+  if(!list_empty(&thread_current()->child_list))
   {
-    struct thread *t = list_entry (child, struct thread, child_list_elem);
-    child = list_remove (child);
-    sema_up (&t->sema_exit);
+    for (child = list_begin (&thread_current()->child_list);
+          child != list_end (&thread_current()->child_list); )
+    {
+      struct thread *t = list_entry(child, struct thread, child_list_elem);
+      child = list_remove (child);
+      sema_up(&t->sema_exit);
+    }
   }
   ASSERT(thread_current()->target_lock == NULL);
+  
   sema_up(&thread_current()->sema_wait);
   sema_down(&thread_current()->sema_exit);
-
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */

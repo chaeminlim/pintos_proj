@@ -127,6 +127,7 @@ void free_kaddr_page(void* kaddr)
         //delete_vma(&thread_current()->mm_struct, page->vma);
         free(page);
     }
+    
     lock_release(&lru_lock);
 }
 

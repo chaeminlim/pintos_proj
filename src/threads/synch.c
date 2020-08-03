@@ -261,12 +261,12 @@ lock_release (struct lock *lock)
       for(; elem != list_end(&curr_thread->donation_list); elem = list_next(elem))
       {
         waiting_thread = list_entry(elem, struct thread, donation_elem);
-        if(waiting_thread->target_lock == lock)
-        {
+        /* if(waiting_thread->target_lock == lock)
+        { */
           list_remove(&waiting_thread->donation_elem);
           waiting_thread->target_lock = NULL;
-        }
-        else NOT_REACHED();
+        /* }
+        else NOT_REACHED(); */
       }
       update_donation_priority(curr_thread); 
     }

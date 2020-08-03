@@ -30,11 +30,14 @@ void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
 void is_string_safe(char* str);
-void is_buffer_safe(void* buffer, unsigned int size);  
+void is_buffer_safe(void* buffer, unsigned int size);
+void unpin_page_string(char* str);
+void unpin_page_buffer(void* buffer, unsigned int size);
+
 mapid_t mmap(int fd, void *addr);
 void munmap(mapid_t mapping);
 
-struct semaphore filesys_sema;
+struct lock filesys_lock;
 struct semaphore writer_sema;
 struct semaphore mutex;
 int reader_count;
@@ -42,7 +45,7 @@ int reader_count;
 void
 syscall_init (void)
 {
-  sema_init(&filesys_sema, 1);
+  lock_init(&filesys_lock);
   sema_init(&writer_sema, 1);
   sema_init(&mutex, 1);
   reader_count = 0;
@@ -92,8 +95,10 @@ syscall_handler (struct intr_frame *f)
       is_safe_addr(f->esp + 8);
       char* file = (char*)*((int*)f->esp + 1);
       is_string_safe(file);
+      
       unsigned int initial_size = *(unsigned int*)(f->esp + 8);
       f->eax = create(file, initial_size);
+      unpin_page_string(file);
       break;
     }
     case SYS_REMOVE:
@@ -102,6 +107,7 @@ syscall_handler (struct intr_frame *f)
       char* file = (char*)*((int*)f->esp + 1);
       is_string_safe(file);
       f->eax = remove(file);
+      unpin_page_string(file);
       break;
     }
     case SYS_OPEN:
@@ -110,6 +116,7 @@ syscall_handler (struct intr_frame *f)
       char* file = (char*)*((int*)f->esp + 1);
       is_string_safe(file);
       f->eax = open(file);
+      unpin_page_string(file);
       break;
     }
     case SYS_FILESIZE:
@@ -129,6 +136,7 @@ syscall_handler (struct intr_frame *f)
       is_buffer_safe(buffer, size); 
       int fd = *(int*)(f->esp+4);
       f->eax = read(fd, buffer, size);
+      unpin_page_buffer(buffer, size);
       break;
     }
     case SYS_WRITE:
@@ -141,6 +149,7 @@ syscall_handler (struct intr_frame *f)
       is_string_safe(str);
       int fd = *(int*)(f->esp+4);
       f->eax = write(fd, str, size);
+      unpin_page_string(str);
       break;
     }
     case SYS_SEEK:
@@ -250,14 +259,15 @@ unsigned tell(int fd)
   else return file_tell(t->fd_table[fd]);
 }
 
+
 void close(int fd)
 {
-  sema_down (&filesys_sema);
+  lock_acquire(&filesys_lock);
   struct thread* t = thread_current();
-  if(t->fd_table[fd] == NULL) {sema_up (&filesys_sema);return;}
+  if(t->fd_table[fd] == NULL) {lock_release(&filesys_lock);return;}
   file_close(t->fd_table[fd]);
   t->fd_table[fd] = NULL;
-  sema_up (&filesys_sema);
+  lock_release(&filesys_lock);
 }
 // finished
 int open(char *file)
@@ -265,27 +275,27 @@ int open(char *file)
   struct file* opened_file = NULL;
   int fd_num;
 
-  sema_down (&filesys_sema);
+  lock_acquire(&filesys_lock);
   opened_file = filesys_open(file);
   
   if(opened_file == NULL)
   {
-    sema_up (&filesys_sema);
+    lock_release(&filesys_lock);
     return -1;
   }
   else
   {
     fd_num = allocate_fd_id(thread_current());
-    if(fd_num == -1) {sema_up (&filesys_sema); return -1;}
+    if(fd_num == -1) {lock_release(&filesys_lock); return -1;}
     thread_current()->fd_table[fd_num] = opened_file;
-    sema_up (&filesys_sema);
+    lock_release(&filesys_lock);
     return fd_num;
   }
 }
 
 int read(int fd, void* buffer, unsigned size)
 {
-  sema_down(&filesys_sema);
+  lock_acquire(&filesys_lock);
   
   /* sema_down(&mutex);
   reader_count++;
@@ -320,7 +330,7 @@ int read(int fd, void* buffer, unsigned size)
   if(reader_count == 0) sema_up(&writer_sema);
   sema_up(&mutex); */
 
-  sema_up(&filesys_sema);
+  lock_release(&filesys_lock);
   return ret;
 }
 
@@ -329,7 +339,7 @@ int write(int fd, const void* buffer, unsigned size)
   
   //printf("try lock acquire ! %d\n", curr->tid);
   //sema_down(&writer_sema);
-  sema_down(&filesys_sema);
+  lock_acquire(&filesys_lock);
   struct thread* curr = thread_current();
   int ret;
   //printf("lock acquire ! %d\n", curr->tid);
@@ -347,7 +357,7 @@ int write(int fd, const void* buffer, unsigned size)
       ret = file_write(curr->fd_table[fd], buffer, size);
     }
   }
-  sema_up(&filesys_sema);
+  lock_release(&filesys_lock);
   //sema_up(&writer_sema);
   
   return ret;
@@ -376,6 +386,7 @@ void is_buffer_safe(void* buffer, unsigned size)
     if(vma == NULL) {  exit(-1);}
     if(vma->read_only) exit(-1);
     if(!vma->loaded) allocate_vm_page_mm(vma);
+    vma->pinned = true;
     if(temp_buffer == vaddr_last) break;
     else temp_buffer += PGSIZE;
   }
@@ -395,9 +406,49 @@ void is_string_safe(char* str)
   {
     vaddr = pg_round_down(temp_buffer);
     vma = get_vma_with_vaddr(thread_current()->mm_struct, vaddr);
-    if(vma == NULL) { PANIC("vma NULL!"); exit(-1);}
+    if(vma == NULL) { exit(-1);}
     if(!vma->loaded) allocate_vm_page_mm(vma);
+    vma->pinned = true;
     if(vaddr == vaddr_last) break;
+    else temp_buffer += PGSIZE;
+  }
+}
+
+void unpin_page_string(char* str)
+{
+  size_t size = strlen((char*)str);
+  void* temp_buffer = (void*)str;
+  void* vaddr;
+  void* vaddr_last = pg_round_down((void*)((unsigned int)temp_buffer + size));
+  struct vm_area_struct* vma;
+
+  while(1)
+  {
+    vaddr = pg_round_down(temp_buffer);
+    vma = get_vma_with_vaddr(thread_current()->mm_struct, vaddr);
+    if(vma == NULL) { exit(-1); }
+    if(!vma->loaded)  { NOT_REACHED(); exit(-1); }
+    vma->pinned = false;
+    if(vaddr == vaddr_last) break;
+    else temp_buffer += PGSIZE;
+  }
+}
+
+void unpin_page_buffer(void* buffer, unsigned int size)
+{
+  void* temp_buffer = buffer;
+  void* vaddr_last = pg_round_down((void*)((unsigned)buffer + size));
+  struct vm_area_struct* vma;
+
+  while(1)
+  {
+    temp_buffer = pg_round_down(temp_buffer);
+    vma = get_vma_with_vaddr(thread_current()->mm_struct, temp_buffer);
+    if(vma == NULL) {  exit(-1);}
+    if(vma->read_only) exit(-1);
+    if(!vma->loaded)  { NOT_REACHED(); exit(-1); }
+    vma->pinned = false;
+    if(temp_buffer == vaddr_last) break;
     else temp_buffer += PGSIZE;
   }
 }

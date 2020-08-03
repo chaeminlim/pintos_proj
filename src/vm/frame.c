@@ -129,7 +129,7 @@ struct page* get_victim (void)
     ASSERT (e != NULL);
     page = list_entry (e, struct page, lru_elem);
     ASSERT(page);
-    while (pagedir_is_accessed (page->thread->pagedir, page->vma->vaddr))
+    while (pagedir_is_accessed(page->thread->pagedir, page->vma->vaddr) && page->vma->pinned != true)
     {
         pagedir_set_accessed (page->thread->pagedir, page->vma->vaddr, false);
         e = get_next_lru_clock();

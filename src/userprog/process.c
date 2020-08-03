@@ -22,7 +22,7 @@
 #include "vm/page.h"
 #include "vm/swap.h"
 #include "vm/frame.h"
-extern struct semaphore filesys_sema;
+extern struct lock filesys_lock;
 extern struct lock lru_lock;
 extern struct semaphore writer_sema;
 static thread_func start_process NO_RETURN;
@@ -140,7 +140,6 @@ process_exit (void)
     if(cur->fd_table[i] != NULL) file_close(cur->fd_table[i]);
   }
   //palloc_free_page (cur->fd_table);
-  
   int mapid = 0;
   for(; mapid < cur->mm_struct->next_mapid; mapid++)
   {
@@ -149,14 +148,17 @@ process_exit (void)
       if (mmstrt)
         remove_mmap (cur ,mmstrt);
   }
-
+  
   #ifdef USERPROG
   file_close(cur->executing_file);
   #endif
+  
   free(cur->fd_table);
   // clear vm
   free_vm(cur->mm_struct);
   free(cur->mm_struct);
+  
+  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -171,7 +173,7 @@ process_exit (void)
          that's been freed (and cleared). */
       cur->pagedir = NULL;
       pagedir_activate (NULL);
-      pagedir_destroy (pd);
+      pagedir_destroy(pd);
     }
 }
 
@@ -284,20 +286,20 @@ load (const char *file_name, void (**eip) (void), void **esp)
   }
   process_activate (); 
 
-  sema_down (&filesys_sema);
+  lock_acquire(&filesys_lock);
   /* Open executable file. */
   file = filesys_open (t->name);
   
   if (file == NULL) 
   {
-    sema_up(&filesys_sema);
+    lock_release(&filesys_lock);
     printf ("load: %s: open failed\n", file_name);
     goto done; 
   }
 
   t->executing_file = file;
   file_deny_write (t->executing_file);
-  sema_up(&filesys_sema);
+  lock_release(&filesys_lock);
   
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -518,6 +520,7 @@ setup_stack (void **esp, const char* cmd_line)
     vma->type = PG_ANON;
     vma->read_only = false;
     kpage->vma = vma;
+    vma->swap_slot = 0xFFFFFFFF;
     insert_vma(thread_current()->mm_struct, vma);
     
     
@@ -688,10 +691,12 @@ void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
       {   NOT_REACHED (); }
       free_vaddr_page(vma->vaddr);
     }
+    
     vma->loaded = false;
     e = list_remove(e);
     delete_vma(curr->mm_struct, vma); 
   }
+  file_close(mmapstrt->file);
   list_remove(&mmapstrt->mmap_elem);
   free(mmapstrt);
 }
