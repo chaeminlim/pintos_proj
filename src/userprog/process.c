@@ -678,7 +678,6 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
 
 void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
 {
-  sema_down(&writer_sema);
   struct list_elem *e;
   for (e = list_begin (&mmapstrt->vma_list); e != list_end (&mmapstrt->vma_list); )
   {
@@ -695,7 +694,6 @@ void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
   }
   list_remove(&mmapstrt->mmap_elem);
   free(mmapstrt);
-  sema_up(&writer_sema);
 }
 
 

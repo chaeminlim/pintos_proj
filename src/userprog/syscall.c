@@ -252,13 +252,12 @@ unsigned tell(int fd)
 
 void close(int fd)
 {
-  
-  struct thread* t = thread_current();
-  if(t->fd_table[fd] == NULL) return;
   sema_down (&filesys_sema);
+  struct thread* t = thread_current();
+  if(t->fd_table[fd] == NULL) {sema_up (&filesys_sema);return;}
   file_close(t->fd_table[fd]);
-  sema_up (&filesys_sema);
   t->fd_table[fd] = NULL;
+  sema_up (&filesys_sema);
 }
 // finished
 int open(char *file)
@@ -286,12 +285,13 @@ int open(char *file)
 
 int read(int fd, void* buffer, unsigned size)
 {
-  sema_down(&mutex);
+  sema_down(&filesys_sema);
+  
+  /* sema_down(&mutex);
   reader_count++;
   if(reader_count == 1) sema_down(&writer_sema);
   sema_up(&mutex);
-  //sema_down(&filesys_sema);
-  //printf("read!\n");
+   *///printf("read!\n");
   struct thread* curr = thread_current();
   int ret;
   if(fd == 1) ret = -1;
@@ -314,11 +314,13 @@ int read(int fd, void* buffer, unsigned size)
       
     }
   }
-  //sema_up(&filesys_sema);
-  sema_down(&mutex);
+  
+  /* sema_down(&mutex);
   reader_count--;
   if(reader_count == 0) sema_up(&writer_sema);
-  sema_up(&mutex);
+  sema_up(&mutex); */
+
+  sema_up(&filesys_sema);
   return ret;
 }
 
@@ -326,8 +328,8 @@ int write(int fd, const void* buffer, unsigned size)
 {
   
   //printf("try lock acquire ! %d\n", curr->tid);
-  sema_down(&writer_sema);
-  //sema_down(&filesys_sema);
+  //sema_down(&writer_sema);
+  sema_down(&filesys_sema);
   struct thread* curr = thread_current();
   int ret;
   //printf("lock acquire ! %d\n", curr->tid);
@@ -335,20 +337,19 @@ int write(int fd, const void* buffer, unsigned size)
   else if(fd == 1)
   {
     putbuf((char*)buffer, size);
-    ret = size;
+    ret =  size;
   }
   else
   {
     if(curr->fd_table[fd] == NULL) ret = -1;
     else
     {
-      int rett = file_write(curr->fd_table[fd], buffer, size);
-      ret = rett;
+      ret = file_write(curr->fd_table[fd], buffer, size);
     }
   }
-  //printf("lock release ! %d\n", curr->tid);
-  //sema_up(&filesys_sema);
-  sema_up(&writer_sema);
+  sema_up(&filesys_sema);
+  //sema_up(&writer_sema);
+  
   return ret;
 }
 
@@ -372,7 +373,7 @@ void is_buffer_safe(void* buffer, unsigned size)
   {
     temp_buffer = pg_round_down(temp_buffer);
     vma = get_vma_with_vaddr(thread_current()->mm_struct, temp_buffer);
-    if(vma == NULL) exit(-1);
+    if(vma == NULL) {  exit(-1);}
     if(vma->read_only) exit(-1);
     if(!vma->loaded) allocate_vm_page_mm(vma);
     if(temp_buffer == vaddr_last) break;
@@ -394,7 +395,7 @@ void is_string_safe(char* str)
   {
     vaddr = pg_round_down(temp_buffer);
     vma = get_vma_with_vaddr(thread_current()->mm_struct, vaddr);
-    if(vma == NULL) exit(-1);
+    if(vma == NULL) { PANIC("vma NULL!"); exit(-1);}
     if(!vma->loaded) allocate_vm_page_mm(vma);
     if(vaddr == vaddr_last) break;
     else temp_buffer += PGSIZE;
@@ -409,49 +410,56 @@ mapid_t mmap(int fd, void *addr)
   if((unsigned)addr < USER_STACK_BOTTOM) return -1;
   if (is_user_vaddr (addr) == false) return -1;
   // lock
-  struct file* target_file = thread_current()->fd_table[fd];
+  struct thread* curr = thread_current();
+  struct file* target_file = curr->fd_table[fd];
   if(target_file == NULL) {   return -1; }
   struct file* file_reopened = file_reopen(target_file);
   if(file_reopened == NULL) {  return -1; }
+
   else
   {
     // alloc mmap struct
     struct mmap_struct* mmap_strt = (struct mmap_struct*)malloc(sizeof(struct mmap_struct)); // need to free
     // setup
     if(mmap_strt == NULL) { return -1; }
-    
     memset(mmap_strt, 0, sizeof(struct mmap_struct));
     list_init(&mmap_strt->vma_list);
     mmap_strt->file = file_reopened;
     mmap_strt->mapid = allocate_mapid();
-    list_push_back(&thread_current()->mm_struct->mmap_list, &mmap_strt->mmap_elem);
+    list_push_back(&curr->mm_struct->mmap_list, &mmap_strt->mmap_elem);
     off_t file_len = file_length(mmap_strt->file);
     size_t offset = 0;
+    struct vm_area_struct* vma;
     for(; file_len > 0;)
     {
       // 기존에 존재하는 vma라면
-      if(get_vma_with_vaddr(thread_current()->mm_struct, addr)) { return -1; }
-      struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof (struct vm_area_struct));
-      memset (vma, 0, sizeof(struct vm_area_struct));
-      vma->type = PG_FILE;
-      vma->read_only = false;
-      vma->vaddr = addr;
-      vma->offset = offset;
-      vma->read_bytes = file_len < PGSIZE ? file_len : PGSIZE;
-      vma->zero_bytes = PGSIZE - vma->read_bytes;
-      vma->file = mmap_strt->file;
-      vma->loaded = false;
-      vma->swap_slot = 0xFFFFFFFF;
-      list_push_back(&mmap_strt->vma_list, &vma->mmap_elem);
-      insert_vma(thread_current()->mm_struct, vma);
-      
+      vma = get_vma_with_vaddr(curr->mm_struct, addr);
+      if(vma)
+      {
+        return -1;
+      }
+      else
+      {
+        vma = (struct vm_area_struct*)malloc(sizeof (struct vm_area_struct));
+        memset (vma, 0, sizeof(struct vm_area_struct));
+        vma->type = PG_FILE;
+        vma->read_only = false;
+        vma->vaddr = addr;
+        vma->offset = offset;
+        vma->read_bytes = file_len < PGSIZE ? file_len : PGSIZE;
+        vma->zero_bytes = PGSIZE - vma->read_bytes;
+        vma->file = mmap_strt->file;
+        vma->loaded = false;
+        vma->swap_slot = 0xFFFFFFFF;
+        list_push_back(&mmap_strt->vma_list, &vma->mmap_elem);
+        insert_vma(curr->mm_struct, vma);
+        
+      }
       //printf("addr %0x\n", (uint32_t)addr);
       addr += PGSIZE;
       offset += PGSIZE;
       file_len -= PGSIZE;
-      
     }
-    
     return mmap_strt->mapid;
   }
 }
