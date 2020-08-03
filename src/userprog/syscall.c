@@ -374,6 +374,7 @@ void is_buffer_safe(void* buffer, unsigned size)
     vma = get_vma_with_vaddr(thread_current()->mm_struct, temp_buffer);
     if(vma == NULL) exit(-1);
     if(vma->read_only) exit(-1);
+    if(!vma->loaded) allocate_vm_page_mm(vma);
     if(temp_buffer == vaddr_last) break;
     else temp_buffer += PGSIZE;
   }
@@ -394,6 +395,7 @@ void is_string_safe(char* str)
     vaddr = pg_round_down(temp_buffer);
     vma = get_vma_with_vaddr(thread_current()->mm_struct, vaddr);
     if(vma == NULL) exit(-1);
+    if(!vma->loaded) allocate_vm_page_mm(vma);
     if(vaddr == vaddr_last) break;
     else temp_buffer += PGSIZE;
   }

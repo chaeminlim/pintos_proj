@@ -29,7 +29,6 @@ struct vm_area_struct
     bool loaded;
     bool read_only;
     enum PG_TYPE type;
-    unsigned long vm_end;
     struct file* file;
     void* vaddr;
     size_t offset;

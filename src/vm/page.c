@@ -30,6 +30,7 @@ struct page* allocate_page(enum palloc_flags flags, struct vm_area_struct* vma)
         swap_pages();
         page->kaddr = palloc_get_page(flags);
     }
+    
     return page;
 }
 

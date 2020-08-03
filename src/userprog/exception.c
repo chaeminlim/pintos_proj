@@ -165,7 +165,7 @@ page_fault (struct intr_frame *f)
          }
          else
          {
-            //printf("Not allowed stack! %0x\n", fault_addr);
+            //PANIC("Not allowed stack! %0x\n", fault_addr);
          }
       }
    }

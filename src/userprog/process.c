@@ -470,26 +470,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
       /* Get a page of memory. */
-      /* uint8_t *kpage = palloc_get_page (PAL_USER);
-      if (kpage == NULL)
-        return false;
-
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-      // 한 페이지 할당 완료
-
-      // Add the page to the process's address space.
-      // 프로세스의 주소 공간에 install함
-      if (!install_page (upage, kpage, writable)) 
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
-         */
+      
       // vm codes
       struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof(struct vm_area_struct));
       if (vma == NULL) return false;
@@ -740,6 +721,7 @@ bool expand_stack(void* addr)
       vma->read_only = false;
       vma->loaded = true;
       vma->swap_slot = 0xFFFFFFFF;
+      vma->loaded = false;
       insert_vma(thread_current()->mm_struct, vma);
     }
   }
@@ -756,6 +738,7 @@ bool expand_stack(void* addr)
       free (vvma);
       return false;
     }
+    kpage->vma->loaded = true;
     lock_acquire(&lru_lock);
     add_page_lru(kpage);
     lock_release(&lru_lock);
