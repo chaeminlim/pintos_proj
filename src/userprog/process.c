@@ -504,103 +504,99 @@ setup_stack (void **esp, const char* cmd_line)
 
   kpage = allocate_page(PAL_USER | PAL_ZERO, NULL);
   
-  lock_acquire(&lru_lock);
   add_page_lru(kpage);
-  lock_release(&lru_lock);
   
-  if (kpage != NULL) 
+  success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
+  if (success) // install page가 성공했을 때, 여기서 부터 argument passing 적용
+  {
+    // vm
+    struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof(struct vm_area_struct));
+    if (vma == NULL) return false;
+    memset(vma, 0, sizeof(struct vm_area_struct));
+    vma->loaded = true;
+    vma->vaddr = (uint8_t*)PHYS_BASE - PGSIZE;
+    vma->type = PG_ANON;
+    vma->read_only = false;
+    kpage->vma = vma;
+    insert_vma(thread_current()->mm_struct, vma);
+    
+    
+    *esp = PHYS_BASE;
+    // setting argument 시작
+    uint8_t* temp_head;
+    int total_len = 0;
+    int argc = 0;
+
+    // 스택 포인터의 주소를 내리면서, 낮은 주소에서 높은 방향으로 문자열을 쌓아야 함.
+    
+    // argument string 쌓기
+    
+    int arg_len = strlen(cmd_line);
+    
+    *esp -= 1;
+    *(uint8_t*) (*esp + 1) = '\0';
+    *esp -= arg_len;
+    memcpy(*esp, cmd_line, arg_len);
+    total_len += (arg_len + 1);
+    
+    // 띄어쓰기 널 처리
+    int index = total_len;
+    for(; index >= 0; index--)
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
-      if (success) // install page가 성공했을 때, 여기서 부터 argument passing 적용
-      {
-        // vm
-        struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof(struct vm_area_struct));
-        if (vma == NULL) return false;
-        memset(vma, 0, sizeof(struct vm_area_struct));
-        vma->loaded = true;
-        vma->vaddr = (uint8_t*)PHYS_BASE - PGSIZE;
-        vma->type = PG_ANON;
-        vma->read_only = false;
-        kpage->vma = vma;
-        insert_vma(thread_current()->mm_struct, vma);
-        
-        
-        *esp = PHYS_BASE;
-        // setting argument 시작
-        uint8_t* temp_head;
-        int total_len = 0;
-        int argc = 0;
-
-        // 스택 포인터의 주소를 내리면서, 낮은 주소에서 높은 방향으로 문자열을 쌓아야 함.
-        
-        // argument string 쌓기
-        
-        int arg_len = strlen(cmd_line);
-        
-        *esp -= 1;
-        *(uint8_t*) (*esp + 1) = '\0';
-        *esp -= arg_len;
-        memcpy(*esp, cmd_line, arg_len);
-        total_len += (arg_len + 1);
-        
-        // 띄어쓰기 널 처리
-        int index = total_len;
-        for(; index >= 0; index--)
-        {
-          temp_head = (*esp + index); // top 부터 시작
-          //printf("%c!\n", *(char*)temp_head);
-          if(*temp_head == ' ') 
-          { 
-            *temp_head = '\0';
-          }
-        }
-        // alignment 하기
-        if(total_len % 4 != 0)
-        {
-          *esp -= (4 - total_len % 4);
-        }
-
-        // push argv[argc]
-        *esp -= 4;
-        * (uint32_t *) *esp = (uint32_t) NULL;
-        
-          // 맨 윗주소는 '\0'
-        for(index = 0; index <= total_len - 1; index++)
-        {
-          temp_head = (PHYS_BASE - index); // top - 1 부터 시작
-          if(*temp_head != '\0' && *(temp_head - 1) == '\0')
-          {
-            *esp -= 4;
-            *(uint32_t *) *esp = (uint32_t) temp_head;
-            argc++;
-          }
-        }
-
-        /*push exe name*/
-        *esp -= 4;
-        * (uint32_t *) *esp = (uint32_t) (PHYS_BASE - total_len);
-        argc++;
-
-        // push argv
-        * (uint32_t *) (*esp - 4) = *(uint32_t *) esp;
-        *esp -= 4;
-
-        /*push argc*/
-        *esp -= 4;
-        * (int *) *esp = argc;
-        
-        /*push return address*/
-        *esp -= 4;
-        * (uint32_t *) *esp = 0x0;
-       
+      temp_head = (*esp + index); // top 부터 시작
+      //printf("%c!\n", *(char*)temp_head);
+      if(*temp_head == ' ') 
+      { 
+        *temp_head = '\0';
       }
-      else
-        {
-          NOT_REACHED();
-          free_kaddr_page(kpage->kaddr);
-        }
-        
     }
+    // alignment 하기
+    if(total_len % 4 != 0)
+    {
+      *esp -= (4 - total_len % 4);
+    }
+
+    // push argv[argc]
+    *esp -= 4;
+    * (uint32_t *) *esp = (uint32_t) NULL;
+    
+      // 맨 윗주소는 '\0'
+    for(index = 0; index <= total_len - 1; index++)
+    {
+      temp_head = (PHYS_BASE - index); // top - 1 부터 시작
+      if(*temp_head != '\0' && *(temp_head - 1) == '\0')
+      {
+        *esp -= 4;
+        *(uint32_t *) *esp = (uint32_t) temp_head;
+        argc++;
+      }
+    }
+
+    /*push exe name*/
+    *esp -= 4;
+    * (uint32_t *) *esp = (uint32_t) (PHYS_BASE - total_len);
+    argc++;
+
+    // push argv
+    * (uint32_t *) (*esp - 4) = *(uint32_t *) esp;
+    *esp -= 4;
+
+    /*push argc*/
+    *esp -= 4;
+    * (int *) *esp = argc;
+    
+    /*push return address*/
+    *esp -= 4;
+    * (uint32_t *) *esp = 0x0;
+    
+  }
+  else
+    {
+      NOT_REACHED();
+      free_kaddr_page(kpage->kaddr);
+    }
+    
+ 
   return success;
 }
 
@@ -676,9 +672,7 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
     default:
         NOT_REACHED();
   }
-  lock_acquire(&lru_lock);
   add_page_lru(kpage);
-  lock_release(&lru_lock);
   return true;
 }
 
@@ -734,14 +728,12 @@ bool expand_stack(void* addr)
     if (!install_page(temp_addr, kpage->kaddr, true))
     {
       NOT_REACHED();
-      free_kaddr_page(kpage);
+      /* free_kaddr_page(kpage);
       free (vvma);
-      return false;
+      return false; */
     }
     kpage->vma->loaded = true;
-    lock_acquire(&lru_lock);
     add_page_lru(kpage);
-    lock_release(&lru_lock);
   }
   else
     NOT_REACHED();

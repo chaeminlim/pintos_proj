@@ -133,8 +133,13 @@ main (void)
   locate_block_devices ();
   filesys_init (format_filesys);
 #endif
+
+#ifdef USERPROG
   init_lru_list();
   swap_init();
+  
+#endif
+  
   
   printf ("Boot complete.\n");
   

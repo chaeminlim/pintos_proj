@@ -24,8 +24,9 @@ void init_lru_list(void)
 
 void add_page_lru(struct page* page)
 {
-    ASSERT(lock_held_by_current_thread(&lru_lock));
+    lock_acquire(&lru_lock);
     list_push_back(&lru_list, &page->lru_elem);
+    lock_release(&lru_lock);
 }
 
 void delete_page_lru(struct page* page)
