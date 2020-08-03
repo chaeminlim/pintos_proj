@@ -31,6 +31,7 @@ size_t swap_out(struct page* page)
 {
     int i;
 	ASSERT(!lock_held_by_current_thread(&swap_lock));
+	sema_down(&filesys_sema);
     lock_acquire(&swap_lock);
 	
     size_t swap_index = bitmap_scan(swap_bitmap, 0, 1, true);
@@ -44,17 +45,20 @@ size_t swap_out(struct page* page)
 	page->vma->swap_slot = swap_index;
 	bitmap_set(swap_bitmap, swap_index, false);
 	lock_release(&swap_lock);
+	sema_up(&filesys_sema);
 	return swap_index;
 }
 
 void swap_in(size_t swap_index, void* kaddr)
 {
 	ASSERT(!lock_held_by_current_thread(&swap_lock));
+	sema_down(&filesys_sema);
     lock_acquire(&swap_lock);
 
 	if(swap_index == 0xFFFFFFFF)
 	{
 		lock_release(&swap_lock);
+		sema_up(&filesys_sema);
 		return;
 	}
     if (bitmap_test(swap_bitmap, swap_index) == true)
@@ -72,6 +76,7 @@ void swap_in(size_t swap_index, void* kaddr)
 	bitmap_set(swap_bitmap, swap_index, true);
 	
 	lock_release(&swap_lock);
+	sema_up(&filesys_sema);
 }
 
 void swap_clear (size_t swap_index)
