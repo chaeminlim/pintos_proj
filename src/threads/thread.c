@@ -329,7 +329,6 @@ thread_exit (void)
   process_exit ();
   #endif
 
-  ASSERT(thread_current());
   
   for (child = list_begin (&thread_current()->child_list);
         child != list_end (&thread_current()->child_list); )
@@ -338,7 +337,7 @@ thread_exit (void)
     child = list_remove (child);
     sema_up (&t->sema_exit);
   }
-  
+  ASSERT(thread_current()->target_lock == NULL);
   sema_up(&thread_current()->sema_wait);
   sema_down(&thread_current()->sema_exit);
 

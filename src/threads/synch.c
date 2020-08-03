@@ -198,26 +198,23 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
   enum intr_level old_level = intr_disable();
-  
+  struct thread* current_thread = thread_current();
+
   if(thread_mlfqs != true)
   {
-    struct thread* current_thread = thread_current();
+    
     if(lock->holder != NULL) // 락 홀더가 있다면
     {// 대기해야 하는 상태
       list_push_back(&(lock->holder->donation_list), &(current_thread->donation_elem));
       current_thread->target_lock = lock;
       update_donation_priority(lock->holder);
     }
-    else // 락 홀더가 없다면
-    {
-      current_thread->target_lock = NULL;
-    }
   }
 
-  sema_down (&lock->semaphore);
-  lock->holder = thread_current();
+  sema_down(&lock->semaphore);
+  current_thread->target_lock = NULL;
+  lock->holder = current_thread;
   intr_set_level (old_level);
-  
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -254,6 +251,7 @@ lock_release (struct lock *lock)
   struct thread* curr_thread = thread_current();
   struct list_elem* elem;
   struct thread* waiting_thread = NULL;
+
   if(thread_mlfqs != true)
   {
     if(!list_empty(&curr_thread->donation_list)) // donation list가 비지 않을 때
@@ -265,8 +263,10 @@ lock_release (struct lock *lock)
         waiting_thread = list_entry(elem, struct thread, donation_elem);
         if(waiting_thread->target_lock == lock)
         {
-          list_remove(&waiting_thread->donation_elem); 
+          list_remove(&waiting_thread->donation_elem);
+          waiting_thread->target_lock = NULL;
         }
+        else NOT_REACHED();
       }
       update_donation_priority(curr_thread); 
     }
@@ -276,6 +276,7 @@ lock_release (struct lock *lock)
   }
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+  //curr_thread->target_lock = NULL;
   intr_set_level (old_level);
 }
 
