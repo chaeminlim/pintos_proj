@@ -77,19 +77,16 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
-  t->load_status = load (file_name, &if_.eip, &if_.esp);
+  t->load_status = load(file_name, &if_.eip, &if_.esp);
   /* If load failed, quit. */
   //hex_dump( if_.esp,  if_.esp, PHYS_BASE -  if_.esp, true);
-  sema_up (&t->sema_load); // 부모의 exec을 재개 시킨다
+  sema_up(&t->sema_load); // 부모의 exec을 재개 시킨다
   //palloc_free_page (pg_round_down(file_name));
-  free(file_name_ );
+  free(file_name_);
   if (!t->load_status) 
   {
-    //thread_exit ();
     exit(-1);
   }
-  
-    
   //set_argument_stack(file_name, )
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -120,9 +117,11 @@ process_wait (tid_t child_tid)
   int exit_status;
   child = get_child_thread(child_tid);
   if(child == NULL) return -1;
-
-  sema_down(&child->sema_wait);
-  list_remove (&child->child_list_elem);
+  if(child->exit_status == false)
+  {
+    sema_down(&child->sema_wait);
+  }
+  list_remove(&child->child_list_elem);
   exit_status = child->exit_code;
   sema_up(&child->sema_exit);
   return exit_status;
@@ -158,7 +157,7 @@ process_exit (void)
   // clear vm
   free_vm(cur->mm_struct);
   free(cur->mm_struct);
-  
+
   ASSERT(cur->target_lock == NULL);
 
   struct list_elem *child;
@@ -171,12 +170,11 @@ process_exit (void)
       child = list_remove (child);
       sema_up(&t->sema_exit);
     }
-  }  
-  sema_up(&cur->sema_wait);
+  }
 
+  sema_up(&cur->sema_wait);
+  cur->exit_status = true;
   sema_down(&cur->sema_exit);
-  
-  
   
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

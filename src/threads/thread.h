@@ -127,6 +127,7 @@ struct thread
     struct list_elem child_list_elem;
     struct thread* parent;
     bool load_status;
+    bool exit_status;
     int exit_code;
     // vm
     struct mm_struct* mm_struct;

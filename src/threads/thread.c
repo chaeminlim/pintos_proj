@@ -549,7 +549,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->recent_cpu = RECENT_CPU_NORMAL;
   list_push_back (&all_list, &t->allelem);
   // systemcall
-  t->exit_code = -1;
+  t->exit_code = 0;
+  t->exit_status = false;
   list_init(&t->child_list);
   sema_init(&t->sema_exit, 0);
   sema_init(&t->sema_wait, 0);
