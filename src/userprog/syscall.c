@@ -385,7 +385,7 @@ void is_buffer_safe(void* buffer, unsigned size)
     vma = get_vma_with_vaddr(thread_current()->mm_struct, temp_buffer);
     if(vma == NULL) {  exit(-1);}
     if(vma->read_only) exit(-1);
-    if(!vma->loaded) allocate_vm_page_mm(vma);
+    if(vma->loaded != PG_LOADED) allocate_vm_page_mm(vma);
     vma->pinned = true;
     if(temp_buffer == vaddr_last) break;
     else temp_buffer += PGSIZE;
@@ -407,7 +407,7 @@ void is_string_safe(char* str)
     vaddr = pg_round_down(temp_buffer);
     vma = get_vma_with_vaddr(thread_current()->mm_struct, vaddr);
     if(vma == NULL) { exit(-1);}
-    if(!vma->loaded) allocate_vm_page_mm(vma);
+    if(vma->loaded != PG_LOADED) allocate_vm_page_mm(vma);
     vma->pinned = true;
     if(vaddr == vaddr_last) break;
     else temp_buffer += PGSIZE;
@@ -427,7 +427,7 @@ void unpin_page_string(char* str)
     vaddr = pg_round_down(temp_buffer);
     vma = get_vma_with_vaddr(thread_current()->mm_struct, vaddr);
     if(vma == NULL) { exit(-1); }
-    if(!vma->loaded)  { NOT_REACHED(); exit(-1); }
+    if(vma->loaded != PG_LOADED)  { NOT_REACHED(); exit(-1); }
     vma->pinned = false;
     if(vaddr == vaddr_last) break;
     else temp_buffer += PGSIZE;
@@ -446,7 +446,7 @@ void unpin_page_buffer(void* buffer, unsigned int size)
     vma = get_vma_with_vaddr(thread_current()->mm_struct, temp_buffer);
     if(vma == NULL) {  exit(-1);}
     if(vma->read_only) exit(-1);
-    if(!vma->loaded)  { NOT_REACHED(); exit(-1); }
+    if(vma->loaded != PG_LOADED)  { NOT_REACHED(); exit(-1); }
     vma->pinned = false;
     if(temp_buffer == vaddr_last) break;
     else temp_buffer += PGSIZE;
@@ -500,11 +500,10 @@ mapid_t mmap(int fd, void *addr)
         vma->read_bytes = file_len < PGSIZE ? file_len : PGSIZE;
         vma->zero_bytes = PGSIZE - vma->read_bytes;
         vma->file = mmap_strt->file;
-        vma->loaded = false;
+        vma->loaded = PG_NOT_LOADED;
         vma->swap_slot = 0xFFFFFFFF;
         list_push_back(&mmap_strt->vma_list, &vma->mmap_elem);
         insert_vma(curr->mm_struct, vma);
-        
       }
       //printf("addr %0x\n", (uint32_t)addr);
       addr += PGSIZE;

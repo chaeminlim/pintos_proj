@@ -79,8 +79,10 @@ bool insert_vma(struct mm_struct* mm_struct, struct vm_area_struct* vma)
 bool delete_vma(struct mm_struct* mm_struct, struct vm_area_struct* vma)
 {
     if(!hash_delete(&mm_struct->vm_area_hash, &vma->elem)) return false;
-    free_vaddr_page(vma->vaddr);
-    swap_clear (vma->swap_slot);
+    if(vma->loaded == PG_LOADED)
+        free_vaddr_page(vma->vaddr);
+    else if(vma->loaded == PG_SWAPED)
+        swap_clear (vma->swap_slot);
     free(vma);
     return true;
 }
@@ -101,8 +103,10 @@ void destroy_vma(struct hash_elem* e, void* aux UNUSED)
 {
     ASSERT (e != NULL);
     struct vm_area_struct* vma = hash_entry(e, struct vm_area_struct, elem);
-    free_vaddr_page(vma->vaddr);
-    swap_clear(vma->swap_slot);
+    if(vma->loaded == PG_LOADED)
+        free_vaddr_page(vma->vaddr);
+    else if(vma->loaded == PG_SWAPED)
+        swap_clear (vma->swap_slot);
     free(vma);
 }
 
@@ -124,7 +128,6 @@ void free_kaddr_page(void* kaddr)
         pagedir_clear_page (page->thread->pagedir, page->vma->vaddr);
         delete_page_lru(page);
         palloc_free_page(page->kaddr);
-        //delete_vma(&thread_current()->mm_struct, page->vma);
         free(page);
     }
     

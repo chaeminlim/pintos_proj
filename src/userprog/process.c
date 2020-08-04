@@ -501,7 +501,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       vma->vaddr = upage;
       vma->type = PG_BINARY;
       vma->read_only = !writable;
-      vma->loaded = false;
+      vma->loaded = PG_NOT_LOADED;
       vma->swap_slot = 0xFFFFFFFF;
       insert_vma(thread_current()->mm_struct, vma);
       /* Advance. */
@@ -523,24 +523,20 @@ setup_stack (void **esp, const char* cmd_line)
 
   kpage = allocate_page(PAL_USER | PAL_ZERO, NULL);
   
-  add_page_lru(kpage);
-  
-  success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
+  success = install_page (((uint8_t*) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
   if (success) // install page가 성공했을 때, 여기서 부터 argument passing 적용
   {
     // vm
-    struct vm_area_struct* vma = (struct vm_area_struct*)malloc(sizeof(struct vm_area_struct));
-    if (vma == NULL) return false;
-    memset(vma, 0, sizeof(struct vm_area_struct));
-    vma->loaded = true;
-    vma->vaddr = (uint8_t*)PHYS_BASE - PGSIZE;
-    vma->type = PG_ANON;
-    vma->read_only = false;
-    kpage->vma = vma;
-    vma->swap_slot = 0xFFFFFFFF;
-    insert_vma(thread_current()->mm_struct, vma);
-    
-    
+    kpage->vma = (struct vm_area_struct*)malloc(sizeof(struct vm_area_struct));
+    if (kpage->vma == NULL) NOT_REACHED();
+    memset(kpage->vma, 0, sizeof(struct vm_area_struct));
+    kpage->vma->vaddr = (uint8_t*)PHYS_BASE - PGSIZE;
+    kpage->vma->loaded = PG_LOADED;
+    kpage->vma->type = PG_ANON;
+    kpage->vma->read_only = false;
+    kpage->vma->swap_slot = 0xFFFFFFFF;
+    insert_vma(thread_current()->mm_struct, kpage->vma);
+    add_page_lru(kpage);
     *esp = PHYS_BASE;
     // setting argument 시작
     uint8_t* temp_head;
@@ -613,7 +609,6 @@ setup_stack (void **esp, const char* cmd_line)
   else
     {
       NOT_REACHED();
-      free_kaddr_page(kpage->kaddr);
     }
     
  
@@ -664,35 +659,37 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
   ASSERT (kpage != NULL);
   ASSERT (pg_ofs (kpage->kaddr) == 0);
   ASSERT (vma != NULL);
+  ASSERT (vma->loaded != PG_LOADED);
   // vma의 타입에 따라
   switch(vma->type)
   {
     case PG_BINARY:
     case PG_FILE:
     {
+      ASSERT(vma->loaded != PG_SWAPED);
       if (!load_file(kpage->kaddr, vma) 
       || !install_page(kpage->vma->vaddr, kpage->kaddr, !kpage->vma->read_only))
-        {
-          NOT_REACHED();
-        }
-      kpage->vma->loaded = true;
+      {
+        NOT_REACHED();
+      }
       break;
     }
     case PG_ANON:
     {
-      swap_in(vma->swap_slot, kpage->kaddr);
-      ASSERT (pg_ofs(kpage->kaddr) == 0);
+      if(vma->loaded == PG_SWAPED)
+        swap_in(vma->swap_slot, kpage->kaddr);
+
       if (!install_page(kpage->vma->vaddr, kpage->kaddr, !kpage->vma->read_only))
       {
         NOT_REACHED ();
       }
-      kpage->vma->loaded = true;
       break;
     }
     default:
         NOT_REACHED();
   }
   add_page_lru(kpage);
+  kpage->vma->loaded = PG_LOADED;
   return true;
 }
 
@@ -701,16 +698,16 @@ void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
   struct list_elem *e;
   for (e = list_begin (&mmapstrt->vma_list); e != list_end (&mmapstrt->vma_list); )
   {
-    struct vm_area_struct* vma = list_entry (e, struct vm_area_struct, mmap_elem);
-    if (vma->loaded && pagedir_is_dirty(curr->pagedir, vma->vaddr))
+    struct vm_area_struct* vma = list_entry(e, struct vm_area_struct, mmap_elem);
+    if ((vma->loaded == PG_LOADED) && pagedir_is_dirty(curr->pagedir, vma->vaddr))
     {
       if (file_write_at (vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
       {   NOT_REACHED (); }
       free_vaddr_page(vma->vaddr);
     }
     
-    vma->loaded = false;
-    e = list_remove(e);
+    vma->loaded = PG_NOT_LOADED;
+    e = list_remove(&vma->mmap_elem);
     delete_vma(curr->mm_struct, vma); 
   }
   file_close(mmapstrt->file);
@@ -733,9 +730,8 @@ bool expand_stack(void* addr)
       vma->type = PG_ANON;
       vma->vaddr = temp_addr;
       vma->read_only = false;
-      vma->loaded = true;
+      vma->loaded = PG_NOT_LOADED;
       vma->swap_slot = 0xFFFFFFFF;
-      vma->loaded = false;
       insert_vma(thread_current()->mm_struct, vma);
     }
   }
@@ -745,15 +741,15 @@ bool expand_stack(void* addr)
   kpage = allocate_page(PAL_USER | PAL_ZERO, vvma);
   if(kpage != NULL)
   {
-    if (!install_page(temp_addr, kpage->kaddr, true))
+    if (!install_page(upage, kpage->kaddr, true))
     {
       NOT_REACHED();
       /* free_kaddr_page(kpage);
       free (vvma);
       return false; */
     }
-    kpage->vma->loaded = true;
     add_page_lru(kpage);
+    kpage->vma->loaded = PG_LOADED;
   }
   else
     NOT_REACHED();

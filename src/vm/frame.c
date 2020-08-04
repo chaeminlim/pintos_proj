@@ -62,15 +62,16 @@ struct page* find_page_from_lru_list(void *kaddr)
 // swap
 void swap_pages()
 {
+    ASSERT(!lock_held_by_current_thread(&lru_lock));
     lock_acquire(&lru_lock);
-
     struct page *victim = get_victim();
+    
     ASSERT (victim != NULL);
     ASSERT (victim->thread != NULL);
     ASSERT (victim->thread->magic == 0xcd6abf4b);
     ASSERT (victim->vma != NULL);
-    bool dirty = pagedir_is_dirty (victim->thread->pagedir, victim->vma->vaddr);
-    
+    ASSERT (victim->vma->loaded == PG_LOADED);
+    bool dirty = pagedir_is_dirty(victim->thread->pagedir, victim->vma->vaddr);
     switch (victim->vma->type)
     {
         case PG_BINARY:
@@ -78,7 +79,17 @@ void swap_pages()
             if (dirty)
             {
                 victim->vma->swap_slot = swap_out(victim);
+                victim->vma->loaded = PG_SWAPED;
                 victim->vma->type = PG_ANON;
+                lock_release(&lru_lock);
+                free_kaddr_page(victim->kaddr);
+                
+            }
+            else
+            {
+                victim->vma->loaded = PG_NOT_LOADED;
+                lock_release(&lru_lock);
+                free_kaddr_page(victim->kaddr);
             }
             break;
         }
@@ -90,20 +101,25 @@ void swap_pages()
                 if (file_write_at (victim->vma->file, victim->vma->vaddr, victim->vma->read_bytes, victim->vma->offset)
                 != (int) victim->vma->read_bytes) NOT_REACHED();
             }
+            victim->vma->loaded = PG_NOT_LOADED;
+            lock_release(&lru_lock);
+            free_kaddr_page(victim->kaddr);
+            
+            
             break;
         }
             
         case PG_ANON:
         {
             victim->vma->swap_slot = swap_out(victim);
+            victim->vma->loaded = PG_SWAPED;
+            lock_release(&lru_lock);
+            free_kaddr_page(victim->kaddr);
             break;
         }
         default:
             NOT_REACHED ();
     }
-    victim->vma->loaded = false;
-    lock_release(&lru_lock);
-    free_kaddr_page(victim->kaddr);
 }
 
 struct list_elem * get_next_lru_clock (void)

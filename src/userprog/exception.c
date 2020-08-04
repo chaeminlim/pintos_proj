@@ -154,7 +154,13 @@ page_fault (struct intr_frame *f)
    {
       struct vm_area_struct* vma = get_vma_with_vaddr(thread_current()->mm_struct, fault_addr);
       if(vma != NULL)
-      {
+      {/* 
+         printf("vma type %d /", vma->type);
+         printf("vma addr %0x / ", vma->vaddr);
+         printf("vma loaded %0x /", vma->loaded);
+         printf("vma tid %d\n", thread_current()->tid); */
+         ASSERT(vma->loaded != PG_LOADED);
+         
          flag = allocate_vm_page_mm(vma);
       }
       else

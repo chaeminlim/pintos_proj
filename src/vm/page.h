@@ -16,6 +16,13 @@ enum PG_TYPE
     PG_FILE
 };
 
+enum PG_STATUS
+{
+    PG_NOT_LOADED,
+    PG_LOADED,
+    PG_SWAPED
+};
+
 struct page
 {
     void* kaddr;
@@ -26,7 +33,7 @@ struct page
 
 struct vm_area_struct
 {
-    bool loaded;
+    enum PG_STATUS loaded;
     bool read_only;
     bool pinned;
     enum PG_TYPE type;
