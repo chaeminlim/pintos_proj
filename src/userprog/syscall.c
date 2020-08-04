@@ -502,6 +502,7 @@ mapid_t mmap(int fd, void *addr)
         vma->file = mmap_strt->file;
         vma->loaded = PG_NOT_LOADED;
         vma->swap_slot = 0xFFFFFFFF;
+        vma->pinned = false;
         list_push_back(&mmap_strt->vma_list, &vma->mmap_elem);
         insert_vma(curr->mm_struct, vma);
       }

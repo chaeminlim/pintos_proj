@@ -503,6 +503,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       vma->read_only = !writable;
       vma->loaded = PG_NOT_LOADED;
       vma->swap_slot = 0xFFFFFFFF;
+      vma->pinned = false;
       insert_vma(thread_current()->mm_struct, vma);
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -535,6 +536,7 @@ setup_stack (void **esp, const char* cmd_line)
     kpage->vma->type = PG_ANON;
     kpage->vma->read_only = false;
     kpage->vma->swap_slot = 0xFFFFFFFF;
+    kpage->vma->pinned = true;
     insert_vma(thread_current()->mm_struct, kpage->vma);
     add_page_lru(kpage);
     *esp = PHYS_BASE;
@@ -636,7 +638,7 @@ install_page (void *upage, void *kpage, bool writable)
 }
 
 
-bool load_file (void *kaddr, struct vm_area_struct *vma)
+bool load_file(void *kaddr, struct vm_area_struct *vma)
 {
   ASSERT (kaddr != NULL);
   ASSERT (vma != NULL);
@@ -688,8 +690,9 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
     default:
         NOT_REACHED();
   }
-  add_page_lru(kpage);
   kpage->vma->loaded = PG_LOADED;
+  add_page_lru(kpage);
+  
   return true;
 }
 
@@ -732,6 +735,7 @@ bool expand_stack(void* addr)
       vma->read_only = false;
       vma->loaded = PG_NOT_LOADED;
       vma->swap_slot = 0xFFFFFFFF;
+      vma->pinned = false;
       insert_vma(thread_current()->mm_struct, vma);
     }
   }
@@ -748,8 +752,9 @@ bool expand_stack(void* addr)
       free (vvma);
       return false; */
     }
-    add_page_lru(kpage);
     kpage->vma->loaded = PG_LOADED;
+    add_page_lru(kpage);
+    
   }
   else
     NOT_REACHED();

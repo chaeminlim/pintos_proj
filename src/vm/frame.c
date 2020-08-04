@@ -133,18 +133,18 @@ struct page* get_victim (void)
     struct page *page;
     struct list_elem *e;
     
-    e = get_next_lru_clock();
-    ASSERT (e != NULL);
-    page = list_entry (e, struct page, lru_elem);
-    ASSERT(page);
-    while (pagedir_is_accessed(page->thread->pagedir, page->vma->vaddr) && page->vma->pinned != true)
+    do
     {
-        pagedir_set_accessed (page->thread->pagedir, page->vma->vaddr, false);
         e = get_next_lru_clock();
         ASSERT (e != NULL);
         page = list_entry (e, struct page, lru_elem);
-        ASSERT (page);
-    }
+        ASSERT(page != NULL);
+        if(pagedir_is_accessed(page->thread->pagedir, page->vma->vaddr) 
+            && page->vma->pinned != true)
+            break;
+        pagedir_set_accessed (page->thread->pagedir, page->vma->vaddr, false);
+    }while(1);
+    
     
     return page;
 }
