@@ -81,15 +81,10 @@ void swap_pages()
                 victim->vma->swap_slot = swap_out(victim);
                 victim->vma->loaded = PG_SWAPED;
                 victim->vma->type = PG_ANON;
-                lock_release(&lru_lock);
-                free_kaddr_page(victim->kaddr);
-                
             }
             else
             {
                 victim->vma->loaded = PG_NOT_LOADED;
-                lock_release(&lru_lock);
-                free_kaddr_page(victim->kaddr);
             }
             break;
         }
@@ -101,11 +96,7 @@ void swap_pages()
                 if (file_write_at (victim->vma->file, victim->vma->vaddr, victim->vma->read_bytes, victim->vma->offset)
                 != (int) victim->vma->read_bytes) NOT_REACHED();
             }
-            victim->vma->loaded = PG_NOT_LOADED;
-            lock_release(&lru_lock);
-            free_kaddr_page(victim->kaddr);
-            
-            
+            victim->vma->loaded = PG_NOT_LOADED;    
             break;
         }
             
@@ -113,13 +104,14 @@ void swap_pages()
         {
             victim->vma->swap_slot = swap_out(victim);
             victim->vma->loaded = PG_SWAPED;
-            lock_release(&lru_lock);
-            free_kaddr_page(victim->kaddr);
+            
             break;
         }
         default:
             NOT_REACHED ();
     }
+    free_kaddr_page(victim->kaddr);
+    lock_release(&lru_lock);
 }
 
 struct list_elem * get_next_lru_clock (void)

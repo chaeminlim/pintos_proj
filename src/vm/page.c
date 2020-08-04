@@ -30,7 +30,7 @@ struct page* allocate_page(enum palloc_flags flags, struct vm_area_struct* vma)
         swap_pages();
         page->kaddr = palloc_get_page(flags);
     }
-    
+
     return page;
 }
 
@@ -119,7 +119,9 @@ void free_vaddr_page(void* vaddr)
 void free_kaddr_page(void* kaddr)
 {
     if(kaddr == NULL) return;
-    lock_acquire(&lru_lock);
+    bool lock_hold;
+    lock_hold = lock_held_by_current_thread(&lru_lock);
+    if(!lock_hold) lock_acquire(&lru_lock);
     struct page *page = find_page_from_lru_list(kaddr);
     if (page)
     {
@@ -131,7 +133,7 @@ void free_kaddr_page(void* kaddr)
         free(page);
     }
     
-    lock_release(&lru_lock);
+    if(!lock_hold) lock_release(&lru_lock);
 }
 
 void free_vm(struct mm_struct* mm)

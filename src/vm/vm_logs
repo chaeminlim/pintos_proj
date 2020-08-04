@@ -1,3 +1,15 @@
+pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/args-none -a args-none --swap-size=4 -- -q  -f run args-none < /dev/null 2> tests/userprog/args-none.errors > tests/userprog/args-none.output
+perl -I../.. ../../tests/userprog/args-none.ck tests/userprog/args-none tests/userprog/args-none.result
+pass tests/userprog/args-none
+pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/args-single -a args-single --swap-size=4 -- -q  -f run 'args-single onearg' < /dev/null 2> tests/userprog/args-single.errors > tests/userprog/args-single.output
+perl -I../.. ../../tests/userprog/args-single.ck tests/userprog/args-single tests/userprog/args-single.result
+pass tests/userprog/args-single
+pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/args-multiple -a args-multiple --swap-size=4 -- -q  -f run 'args-multiple some arguments for you!' < /dev/null 2> tests/userprog/args-multiple.errors > tests/userprog/args-multiple.output
+perl -I../.. ../../tests/userprog/args-multiple.ck tests/userprog/args-multiple tests/userprog/args-multiple.result
+pass tests/userprog/args-multiple
+pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/args-many -a args-many --swap-size=4 -- -q  -f run 'args-many a b c d e f g h i j k l m n o p q r s t u v' < /dev/null 2> tests/userprog/args-many.errors > tests/userprog/args-many.output
+perl -I../.. ../../tests/userprog/args-many.ck tests/userprog/args-many tests/userprog/args-many.result
+pass tests/userprog/args-many
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/args-dbl-space -a args-dbl-space --swap-size=4 -- -q  -f run 'args-dbl-space two  spaces!' < /dev/null 2> tests/userprog/args-dbl-space.errors > tests/userprog/args-dbl-space.output
 perl -I../.. ../../tests/userprog/args-dbl-space.ck tests/userprog/args-dbl-space tests/userprog/args-dbl-space.result
 pass tests/userprog/args-dbl-space
@@ -135,7 +147,64 @@ perl -I../.. ../../tests/userprog/exec-multiple.ck tests/userprog/exec-multiple 
 pass tests/userprog/exec-multiple
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/exec-missing -a exec-missing --swap-size=4 -- -q  -f run exec-missing < /dev/null 2> tests/userprog/exec-missing.errors > tests/userprog/exec-missing.output
 perl -I../.. ../../tests/userprog/exec-missing.ck tests/userprog/exec-missing tests/userprog/exec-missing.result
-pass tests/userprog/exec-missing
+FAIL tests/userprog/exec-missing
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (exec-missing) begin
+  load: no-such-file: open failed
+  no-such-file: exit(-1)
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
+Differences in `diff -u' format:
+  (exec-missing) begin
+  load: no-such-file: open failed
+- no-such-file: exit(-1)
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
++ no-such-file: exit(-1)
+Acceptable output:
+  (exec-missing) begin
+  load: no-such-file: open failed
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
+Differences in `diff -u' format:
+  (exec-missing) begin
+  load: no-such-file: open failed
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
++ no-such-file: exit(-1)
+Acceptable output:
+  (exec-missing) begin
+  load: no-such-file: open failed
+  (exec-missing) exec("no-such-file"): -1
+  no-such-file: exit(-1)
+  (exec-missing) end
+  exec-missing: exit(0)
+Differences in `diff -u' format:
+  (exec-missing) begin
+  load: no-such-file: open failed
+  (exec-missing) exec("no-such-file"): -1
+- no-such-file: exit(-1)
+  (exec-missing) end
+  exec-missing: exit(0)
++ no-such-file: exit(-1)
+Acceptable output:
+  (exec-missing) begin
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
+Differences in `diff -u' format:
+  (exec-missing) begin
++ load: no-such-file: open failed
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
++ no-such-file: exit(-1)
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/exec-bad-ptr -a exec-bad-ptr --swap-size=4 -- -q  -f run exec-bad-ptr < /dev/null 2> tests/userprog/exec-bad-ptr.errors > tests/userprog/exec-bad-ptr.output
 perl -I../.. ../../tests/userprog/exec-bad-ptr.ck tests/userprog/exec-bad-ptr tests/userprog/exec-bad-ptr.result
 pass tests/userprog/exec-bad-ptr
@@ -217,40 +286,26 @@ pass tests/vm/page-linear
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/page-parallel -a page-parallel -p tests/vm/child-linear -a child-linear --swap-size=4 -- -q  -f run page-parallel < /dev/null 2> tests/vm/page-parallel.errors > tests/vm/page-parallel.output
 perl -I../.. ../../tests/vm/page-parallel.ck tests/vm/page-parallel tests/vm/page-parallel.result
 FAIL tests/vm/page-parallel
-Kernel panic in run: PANIC at ../../lib/kernel/list.c:84 in list_next(): assertion `is_head (elem) || is_interior (elem)' failed.
-Call stack: 0xc002a9e6 0x78656e5fc
+Kernel panic in run: PANIC at ../../threads/thread.c:526 in is_thread(): assertion `t->magic == THREAD_MAGIC' failed.
+Call stack: 0xc002a9b6 0x61657268
 Translation of call stack:
-0xc002a9e6: debug_panic (.../../lib/kernel/debug.c:38)
-0x78656e5fc: (unknown)
+In kernel.o:
+0xc002a9b6: debug_panic (.../../lib/kernel/debug.c:38)
+0x61657268: (unknown)
 pintos -v -k -T 600 --bochs  --filesys-size=2 -p tests/vm/page-merge-seq -a page-merge-seq -p tests/vm/child-sort -a child-sort --swap-size=4 -- -q  -f run page-merge-seq < /dev/null 2> tests/vm/page-merge-seq.errors > tests/vm/page-merge-seq.output
 perl -I../.. ../../tests/vm/page-merge-seq.ck tests/vm/page-merge-seq tests/vm/page-merge-seq.result
 pass tests/vm/page-merge-seq
 pintos -v -k -T 600 --bochs  --filesys-size=2 -p tests/vm/page-merge-par -a page-merge-par -p tests/vm/child-sort -a child-sort --swap-size=4 -- -q  -f run page-merge-par < /dev/null 2> tests/vm/page-merge-par.errors > tests/vm/page-merge-par.output
 perl -I../.. ../../tests/vm/page-merge-par.ck tests/vm/page-merge-par tests/vm/page-merge-par.result
-FAIL tests/vm/page-merge-par
-Kernel panic in run: PANIC at ../../threads/thread.c:535 in is_thread(): assertion `t->magic == THREAD_MAGIC' failed.
-Call stack: 0xc002a9e6 0x61657268
-Translation of call stack:
-In kernel.o:
-0xc002a9e6: debug_panic (.../../lib/kernel/debug.c:38)
-0x61657268: (unknown)
+pass tests/vm/page-merge-par
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/page-merge-stk -a page-merge-stk -p tests/vm/child-qsort -a child-qsort --swap-size=4 -- -q  -f run page-merge-stk < /dev/null 2> tests/vm/page-merge-stk.errors > tests/vm/page-merge-stk.output
 perl -I../.. ../../tests/vm/page-merge-stk.ck tests/vm/page-merge-stk tests/vm/page-merge-stk.result
 FAIL tests/vm/page-merge-stk
-Kernel panic in run: PANIC at ../../threads/thread.c:535 in is_thread(): assertion `t->magic == THREAD_MAGIC' failed.
-Call stack: 0xc002a9e6 0x61657268
-Translation of call stack:
-In kernel.o:
-0xc002a9e6: debug_panic (.../../lib/kernel/debug.c:38)
-0x61657268: (unknown)
+run: TIMEOUT after 60 seconds of host CPU time
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/vm/page-merge-mm -a page-merge-mm -p tests/vm/child-qsort-mm -a child-qsort-mm --swap-size=4 -- -q  -f run page-merge-mm < /dev/null 2> tests/vm/page-merge-mm.errors > tests/vm/page-merge-mm.output
 perl -I../.. ../../tests/vm/page-merge-mm.ck tests/vm/page-merge-mm tests/vm/page-merge-mm.result
 FAIL tests/vm/page-merge-mm
-Kernel panic in run: PANIC at ../../lib/kernel/list.c:282 in list_front(): assertion `!list_empty (list)' failed.
-Call stack: 0xc002a9e6 0x6f72665fc
-Translation of call stack:
-0xc002a9e6: debug_panic (.../../lib/kernel/debug.c:38)
-0x6f72665fc: (unknown)
+run: open "buf0": FAILED
 pintos -v -k -T 600 --bochs  --filesys-size=2 -p tests/vm/page-shuffle -a page-shuffle --swap-size=4 -- -q  -f run page-shuffle < /dev/null 2> tests/vm/page-shuffle.errors > tests/vm/page-shuffle.output
 perl -I../.. ../../tests/vm/page-shuffle.ck tests/vm/page-shuffle tests/vm/page-shuffle.result
 pass tests/vm/page-shuffle
@@ -396,7 +451,7 @@ pass tests/userprog/exec-bound
 pass tests/userprog/exec-bound-2
 pass tests/userprog/exec-bound-3
 pass tests/userprog/exec-multiple
-pass tests/userprog/exec-missing
+FAIL tests/userprog/exec-missing
 pass tests/userprog/exec-bad-ptr
 pass tests/userprog/wait-simple
 pass tests/userprog/wait-twice
@@ -425,7 +480,7 @@ pass tests/vm/pt-grow-stk-sc
 pass tests/vm/page-linear
 FAIL tests/vm/page-parallel
 pass tests/vm/page-merge-seq
-FAIL tests/vm/page-merge-par
+pass tests/vm/page-merge-par
 FAIL tests/vm/page-merge-stk
 FAIL tests/vm/page-merge-mm
 pass tests/vm/page-shuffle
