@@ -119,21 +119,21 @@ void free_vaddr_page(void* vaddr)
 void free_kaddr_page(void* kaddr)
 {
     if(kaddr == NULL) return;
-    bool lock_hold;
-    lock_hold = lock_held_by_current_thread(&lru_lock);
-    if(!lock_hold) lock_acquire(&lru_lock);
-    struct page *page = find_page_from_lru_list(kaddr);
-    if (page)
-    {
-        ASSERT (page->thread->magic == 0xcd6abf4b);
-        ASSERT (page->vma != NULL);
-        pagedir_clear_page (page->thread->pagedir, page->vma->vaddr);
-        delete_page_lru(page);
-        palloc_free_page(page->kaddr);
-        free(page);
-    }
+    lock_acquire(&lru_lock);
     
-    if(!lock_hold) lock_release(&lru_lock);
+    free_page(find_page_from_lru_list(kaddr));
+
+    lock_release(&lru_lock);
+}
+
+void free_page(struct page* page)
+{
+    ASSERT (page->thread->magic == 0xcd6abf4b);
+    ASSERT (page->vma != NULL);
+    pagedir_clear_page (page->thread->pagedir, page->vma->vaddr);
+    delete_page_lru(page);
+    palloc_free_page(page->kaddr);
+    free(page);
 }
 
 void free_vm(struct mm_struct* mm)

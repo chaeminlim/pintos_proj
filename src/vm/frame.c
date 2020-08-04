@@ -110,7 +110,7 @@ void swap_pages()
         default:
             NOT_REACHED ();
     }
-    free_kaddr_page(victim->kaddr);
+    free_page(victim);
     lock_release(&lru_lock);
 }
 

@@ -72,6 +72,7 @@ struct vm_area_struct* get_vma_with_vaddr(struct mm_struct* mm_struct, void* vad
 mapid_t allocate_mapid(void);
 void free_vaddr_page(void* vaddr);
 void free_kaddr_page(void* kaddr);
+void free_page(struct page* page);
 struct mmap_struct* find_mmap_struct(mapid_t mapping);
 struct page* allocate_page(enum palloc_flags flags, struct vm_area_struct* vma);
 
