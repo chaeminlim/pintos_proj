@@ -157,7 +157,24 @@ process_exit (void)
   // clear vm
   free_vm(cur->mm_struct);
   free(cur->mm_struct);
+
   
+  ASSERT(cur->target_lock == NULL);
+
+  struct list_elem *child;
+  if(!list_empty(&cur->child_list))
+  {
+    for (child = list_begin (&cur->child_list);
+          child != list_end (&cur->child_list); )
+    {
+      struct thread *t = list_entry(child, struct thread, child_list_elem);
+      child = list_remove (child);
+      sema_up(&t->sema_exit);
+    }
+  }  
+  sema_up(&cur->sema_wait);
+
+  sema_down(&cur->sema_exit);
   
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

@@ -258,15 +258,19 @@ lock_release (struct lock *lock)
     {
       elem = list_front(&curr_thread->donation_list);
       
-      for(; elem != list_end(&curr_thread->donation_list); elem = list_next(elem))
+      for(; elem != list_end(&curr_thread->donation_list); )
       {
         waiting_thread = list_entry(elem, struct thread, donation_elem);
-        /* if(waiting_thread->target_lock == lock)
-        { */
-          list_remove(&waiting_thread->donation_elem);
+        if(waiting_thread->target_lock == lock)
+        {
+          elem = list_remove(&waiting_thread->donation_elem);
           waiting_thread->target_lock = NULL;
-        /* }
-        else NOT_REACHED(); */
+        }
+        else
+        {
+          elem = list_next(elem);
+        }
+        
       }
       update_donation_priority(curr_thread); 
     }
@@ -276,7 +280,6 @@ lock_release (struct lock *lock)
   }
   lock->holder = NULL;
   sema_up (&lock->semaphore);
-  //curr_thread->target_lock = NULL;
   intr_set_level (old_level);
 }
 
