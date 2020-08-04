@@ -85,22 +85,18 @@ void swap_clear (size_t swap_index)
 	ASSERT(!lock_held_by_current_thread(&swap_lock));
 
     lock_acquire(&swap_lock);
-	bool filelock = !lock_held_by_current_thread(&filesys_lock);
-	if(filelock) lock_acquire(&filesys_lock);
     if(swap_index == 0xFFFFFFFF)
 	{
-		if(filelock) lock_release(&filesys_lock);
 		lock_release(&swap_lock);
 		return;
 	}
 	if (bitmap_test(swap_bitmap, swap_index) == true) 
 	{
+		NOT_REACHED();
 	}
 	else
 	{
 		bitmap_set(swap_bitmap, swap_index, true);
 	}
-	if(filelock) lock_release(&filesys_lock);
 	lock_release (&swap_lock);
-	
 }

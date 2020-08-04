@@ -154,10 +154,10 @@ process_exit (void)
   #endif
   
   free(cur->fd_table);
+
   // clear vm
   free_vm(cur->mm_struct);
   free(cur->mm_struct);
-
   
   ASSERT(cur->target_lock == NULL);
 
@@ -175,6 +175,8 @@ process_exit (void)
   sema_up(&cur->sema_wait);
 
   sema_down(&cur->sema_exit);
+  
+  
   
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
