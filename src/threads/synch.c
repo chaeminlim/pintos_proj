@@ -281,6 +281,7 @@ lock_release (struct lock *lock)
   lock->holder = NULL;
   sema_up (&lock->semaphore);
   intr_set_level (old_level);
+  thread_preempt();
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -419,24 +420,13 @@ void update_donation_priority(struct thread* thread)
     struct thread* waiting_thread = NULL;
     int max_priority = thread->origin_priority;
 
-    //printf("%s's donation list priority:", thread->name);
-
     for(; d_elem != list_end(&thread->donation_list); d_elem = list_next(d_elem))
     {
       waiting_thread = list_entry(d_elem, struct thread, donation_elem);
-      //printf("%d", waiting_thread->curr_priority);
-      if(max_priority < waiting_thread->curr_priority)
-      {
-        max_priority = waiting_thread->curr_priority;
-      } 
+      if(max_priority < waiting_thread->curr_priority) max_priority = waiting_thread->curr_priority; 
     }
-    //
-    //printf("\nNow max is %d\n", max_priority);
     thread->curr_priority = max_priority;
-    /* 
-    nested donation 해결법 priority가 변경되었을 때, 
-    priority가 변경된 스레드가 target을 가지고 있다면 holder를 업데이트 해준다.   
-    */
+
     if(thread->target_lock != NULL)
     {
       update_donation_priority(thread->target_lock->holder);
@@ -444,7 +434,14 @@ void update_donation_priority(struct thread* thread)
   }
   else
   {
-    thread->curr_priority = thread->origin_priority;
+    if(thread->curr_priority > thread->origin_priority)
+    {
+      thread->curr_priority = thread->origin_priority;
+    }
+    else
+    {
+      thread->curr_priority = thread->origin_priority;
+    }
   }
 }
 

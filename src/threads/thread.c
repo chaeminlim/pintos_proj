@@ -382,29 +382,27 @@ void
 thread_set_priority (int new_priority) 
 {
   if(thread_mlfqs == true) return;
-  intr_disable();
-  struct thread *curr = thread_current();
-  int old_curr_priority = curr->curr_priority;
   
-  curr->origin_priority = new_priority;
+  struct thread *curr = thread_current();
 
+  if(curr->origin_priority == curr->curr_priority)
+  {// not donated
+    curr->curr_priority = new_priority;
+    curr->origin_priority = new_priority;
+  }
+  else
+  {
+    curr->origin_priority = new_priority;
+  }
+  
   if(list_empty(&curr->donation_list)) //
   {// origin curr 같이 바뀌면 된다.
-    
-    curr->curr_priority = new_priority;
-    if (old_curr_priority > curr->curr_priority)
-      thread_yield();
+    thread_preempt();
   }
   else // donation list 가 들어있을 때
-  { // 최대값으로 바꾼다.
-    if(curr->curr_priority < curr->origin_priority)
-    {
-      curr->curr_priority = curr->origin_priority;
-    }
-    // priority가 최댓값으로 업데이트되면 yield될 상황 없음
+  {
+    update_donation_priority(curr);
   } 
-  intr_enable();
-  thread_preempt();
 }
 
 /* Returns the current thread's priority. */
