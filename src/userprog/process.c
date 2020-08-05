@@ -19,15 +19,19 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
+#ifdef VM
 #include "vm/page.h"
 #include "vm/swap.h"
 #include "vm/frame.h"
+#endif
 extern struct lock filesys_lock;
-extern struct lock lru_lock;
 extern struct semaphore writer_sema;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+#ifdef VM
+extern struct lock lru_lock;
+#endif
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -69,8 +73,9 @@ start_process (void *file_name_)
   struct intr_frame if_;
 
   // vm initialization
+  #ifdef VM
   init_vm(&t->mm_struct->vm_area_hash);
-
+  #endif
 /* Initialize interrupt frame and load executable. */  
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;

@@ -22,8 +22,10 @@
 #include "threads/palloc.h"
 #include "threads/pte.h"
 #include "threads/thread.h"
+#ifdef VM
 #include "vm/swap.h"
 #include "vm/frame.h"
+#endif
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/exception.h"
@@ -120,8 +122,6 @@ main (void)
 #endif
   
   
-#ifdef VM
-#endif
   /* Start thread scheduler and enable interrupts. */
   thread_start ();
   serial_init_queue ();
@@ -134,11 +134,11 @@ main (void)
   filesys_init (format_filesys);
 #endif
 
-#ifdef USERPROG
+#ifdef VM
   init_lru_list();
   swap_init();
-  
 #endif
+  
   
   
   printf ("Boot complete.\n");
@@ -236,6 +236,7 @@ read_command_line (void)
 
   return argv;
 }
+
 
 /* Parses options in ARGV[]
    and returns the first non-option argument. */

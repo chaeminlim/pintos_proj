@@ -769,17 +769,18 @@ struct thread* get_child_thread(tid_t tid)
   return NULL;
 }
 
+#ifdef USERPROG
+
 int allocate_fd_id(struct thread* t)
 {
-  #ifdef USERPROG
   int i = 3;
   for(; i < 128; i++)
   {
     if(t->fd_table[i] == NULL) return i;
   }
-  #endif
   return -1;
 }
+#endif
 
 static void
 update_next_tick_to_awake (int64_t tick)

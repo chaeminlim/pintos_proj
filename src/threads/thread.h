@@ -193,7 +193,10 @@ void increase_recent_cpu(void);
 
    /* related with systemcalls*/
 struct thread* get_child_thread(tid_t);
+
+#ifdef USERPROG
 int allocate_fd_id(struct thread*);
+#endif
 
 void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t ticks);
