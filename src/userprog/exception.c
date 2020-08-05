@@ -130,9 +130,7 @@ kill (struct intr_frame *f)
 static void
 page_fault (struct intr_frame *f) 
 {
-   #ifdef VM
-   if(IN_SWAP_PAGES[thread_current()->tid]) PANIC("IN SWAP PAGE FAULT!");
-   #endif
+   
 
    bool not_present;  /* True: not-present page, false: writing r/o page. */
    bool write;        /* True: access was write, false: access was read. */
@@ -148,6 +146,8 @@ page_fault (struct intr_frame *f)
       (#PF)". */
    asm ("movl %%cr2, %0" : "=r" (fault_addr));
    intr_enable ();
+
+   
    /* Turn interrupts back on (they were only off so that we could
       be assured of reading CR2 before it changed). */
    // intr_enable ();   
@@ -164,13 +164,15 @@ page_fault (struct intr_frame *f)
       struct vm_area_struct* vma = get_vma_with_vaddr(thread_current()->mm_struct, fault_addr);
       if(vma != NULL)
       {
+         #ifdef VM
+         if(IN_SWAP_PAGES[thread_current()->tid]) PANIC("IN SWAP PAGE FAULT! %0x, %d, %d", fault_addr, vma->type, vma->loaded);
+         #endif
          /* 
          printf("vma type %d /", vma->type);
          printf("vma addr %0x / ", vma->vaddr);
          printf("vma loaded %0x /", vma->loaded);
          printf("vma tid %d\n", thread_current()->tid); */
          ASSERT(vma->loaded != PG_LOADED);
-         
          flag = allocate_vm_page_mm(vma);
       }
       else

@@ -17,6 +17,7 @@
 #include <string.h>
 #include "vm/frame.h"
 
+extern struct lock lru_lock;
 static void syscall_handler (struct intr_frame *);
 tid_t exec(const char* cmd_line);
 int wait(tid_t);

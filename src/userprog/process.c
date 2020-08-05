@@ -25,6 +25,7 @@
 #include "vm/frame.h"
 #endif
 extern struct lock filesys_lock;
+extern struct lock lru_lock;
 extern struct semaphore writer_sema;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);

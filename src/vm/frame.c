@@ -13,6 +13,8 @@
 struct list lru_list;
 struct lock lru_lock;
 struct list_elem* lru_clock;
+extern struct lock filesys_lock;
+
 #define MAX_SWAP 1024
 bool IN_SWAP_PAGES[MAX_SWAP];
 
@@ -68,12 +70,12 @@ struct page* find_page_from_lru_list(void *kaddr)
 // swap
 void swap_pages()
 {
-    ASSERT(thread_current()->tid < MAX_SWAP);
-    IN_SWAP_PAGES[thread_current()->tid] = true;
     ASSERT(lru_lock.holder != thread_current());
     lock_acquire(&lru_lock);
+    ASSERT(thread_current()->tid < MAX_SWAP);
+    IN_SWAP_PAGES[thread_current()->tid] = true;
     struct page *victim = get_victim();
-    
+    //victim->vma->pinned = true;
     ASSERT (victim != NULL);
     ASSERT (victim->thread != NULL);
     ASSERT (victim->thread->magic == 0xcd6abf4b);
@@ -101,8 +103,11 @@ void swap_pages()
         {
             if (dirty)
             {
-                if (file_write_at (victim->vma->file, victim->vma->vaddr, victim->vma->read_bytes, victim->vma->offset)
+                printf("addr %0x, status %d\n", victim->vma->vaddr, victim->vma->loaded);
+                // 여기서 페이지 폴트 발생
+                if (file_write_at(victim->vma->file, victim->vma->vaddr, victim->vma->read_bytes, victim->vma->offset)
                 != (int) victim->vma->read_bytes) NOT_REACHED();
+                //
             }
             victim->vma->loaded = PG_NOT_LOADED;    
             break;
@@ -141,17 +146,20 @@ struct page* get_victim (void)
     ASSERT(lock_held_by_current_thread(&lru_lock));
     struct page *page;
     struct list_elem *e;
-    
+
     do
     {
         e = get_next_lru_clock();
         ASSERT (e != NULL);
         page = list_entry (e, struct page, lru_elem);
         ASSERT(page != NULL);
-        if(pagedir_is_accessed(page->thread->pagedir, page->vma->vaddr) 
-            && page->vma->pinned != true)
+        ASSERT (page->thread);
+        ASSERT (page->thread->magic == 0xcd6abf4b);
+        ASSERT (page->vma->loaded == PG_LOADED);
+
+        if(!pagedir_is_accessed(page->thread->pagedir, page->vma->vaddr) && page->vma->pinned != true)
             break;
-        pagedir_set_accessed (page->thread->pagedir, page->vma->vaddr, false);
+        pagedir_set_accessed(page->thread->pagedir, page->vma->vaddr, false);
     }while(1);
     
     
