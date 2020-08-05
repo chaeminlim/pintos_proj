@@ -7,6 +7,11 @@
 #include "userprog/syscall.h"
 #include "threads/vaddr.h"
 #include "threads/palloc.h"
+#ifdef VM
+#include "vm/frame.h"
+extern bool IN_SWAP_PAGES[128];
+#endif
+
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -125,6 +130,10 @@ kill (struct intr_frame *f)
 static void
 page_fault (struct intr_frame *f) 
 {
+   #ifdef VM
+   if(IN_SWAP_PAGES[thread_current()->tid]) PANIC("IN SWAP PAGE FAULT!");
+   #endif
+
    bool not_present;  /* True: not-present page, false: writing r/o page. */
    bool write;        /* True: access was write, false: access was read. */
    bool user;         /* True: access by user, false: access by kernel. */

@@ -179,8 +179,8 @@ process_exit (void)
 
   sema_up(&cur->sema_wait);
   cur->exit_status = true;
-  sema_down(&cur->sema_exit);
   
+  sema_down(&cur->sema_exit);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;

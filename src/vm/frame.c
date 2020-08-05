@@ -9,13 +9,19 @@
 #include "kernel/bitmap.h"
 #include "devices/block.h"
 
+
 struct list lru_list;
 struct lock lru_lock;
 struct list_elem* lru_clock;
-
+#define MAX_SWAP 1024
+bool IN_SWAP_PAGES[MAX_SWAP];
 
 void init_lru_list(void)
 {
+    int i = 0;
+    for(; i < MAX_SWAP; i++) 
+    {IN_SWAP_PAGES[i] = false;}    
+
     list_init(&lru_list);
     lock_init(&lru_lock);
     lru_clock = NULL;
@@ -62,7 +68,9 @@ struct page* find_page_from_lru_list(void *kaddr)
 // swap
 void swap_pages()
 {
-    ASSERT(!lock_held_by_current_thread(&lru_lock));
+    ASSERT(thread_current()->tid < MAX_SWAP);
+    IN_SWAP_PAGES[thread_current()->tid] = true;
+    ASSERT(lru_lock.holder != thread_current());
     lock_acquire(&lru_lock);
     struct page *victim = get_victim();
     
@@ -111,6 +119,7 @@ void swap_pages()
             NOT_REACHED ();
     }
     free_page(victim);
+    IN_SWAP_PAGES[thread_current()->tid] = false;
     lock_release(&lru_lock);
 }
 
