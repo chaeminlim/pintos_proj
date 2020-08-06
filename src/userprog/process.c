@@ -136,31 +136,32 @@ process_exit (void)
 {
   struct thread *cur = thread_current();
   uint32_t *pd;
-// clear fd
-  int i = 0;
+  // clear fd
+  int i = 3;
   for(; i < 128; i++)
   {
-    if(cur->fd_table[i] != NULL) file_close(cur->fd_table[i]);
+    if(cur->fd_table[i] != NULL)
+    {
+      file_close(cur->fd_table[i]);
+    }
   }
-  
   #ifdef USERPROG
   file_close(cur->executing_file);
   #endif
-
   int mapid = 0;
   for(; mapid < cur->mm_struct->next_mapid; mapid++)
   {
     struct mmap_struct *mmstrt = find_mmap_struct(mapid);
       if (mmstrt)
+      {
         remove_mmap(cur ,mmstrt);
+      }  
   }
-
   free(cur->fd_table);
 
   // clear vm
   free_vm(cur->mm_struct);
   free(cur->mm_struct);
-
   ASSERT(cur->target_lock == NULL);
 
   struct list_elem *child;
@@ -174,7 +175,6 @@ process_exit (void)
       sema_up(&t->sema_exit);
     }
   }
-
   sema_up(&cur->sema_wait);
   cur->exit_status = true;
   
@@ -709,14 +709,11 @@ void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
 {
   ASSERT(!lock_held_by_current_thread(&lru_lock));
   lock_acquire(&lru_lock);
-  
   struct list_elem *e = list_begin(&mmapstrt->vma_list);
   void* temp_page = malloc(PGSIZE);
   if(temp_page == NULL) NOT_REACHED();
-
   ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
-
   for (; e != list_end (&mmapstrt->vma_list); )
   {
     struct vm_area_struct* vma = list_entry(e, struct vm_area_struct, mmap_elem);
@@ -727,6 +724,7 @@ void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
       {
         if(file_write_at(vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
         {   NOT_REACHED (); }
+        free_page(find_page_from_lru_list(pagedir_get_page(thread_current ()->pagedir, vma->vaddr)));
       }
       else if((vma->loaded == PG_SWAPED))
       {
@@ -735,10 +733,7 @@ void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
         {   NOT_REACHED (); }
       }
       else NOT_REACHED();
-        
-      free_page(find_page_from_lru_list(pagedir_get_page(thread_current ()->pagedir, vma->vaddr)));
     }
-    
     vma->loaded = PG_NOT_LOADED;
     e = list_remove(&vma->mmap_elem);
     delete_vma(curr->mm_struct, vma);
