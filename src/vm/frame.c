@@ -84,6 +84,7 @@ void swap_pages()
     switch (victim->vma->type)
     {
         case PG_BINARY:
+        case PG_FILE:
         {
             if (dirty)
             {
@@ -98,7 +99,7 @@ void swap_pages()
             break;
         }
             
-        case PG_FILE:
+        /* case PG_FILE:
         {
             if (dirty)
             {
@@ -110,7 +111,7 @@ void swap_pages()
             }
             victim->vma->loaded = PG_NOT_LOADED;    
             break;
-        }
+        } */
             
         case PG_ANON:
         {

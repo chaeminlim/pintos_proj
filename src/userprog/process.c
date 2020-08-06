@@ -19,11 +19,9 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
-#ifdef VM
 #include "vm/page.h"
 #include "vm/swap.h"
 #include "vm/frame.h"
-#endif
 extern struct lock filesys_lock;
 extern struct lock lru_lock;
 extern struct semaphore writer_sema;
@@ -144,20 +142,19 @@ process_exit (void)
   {
     if(cur->fd_table[i] != NULL) file_close(cur->fd_table[i]);
   }
-  //palloc_free_page (cur->fd_table);
-  int mapid = 0;
-  for(; mapid < cur->mm_struct->next_mapid; mapid++)
-  {
-    
-    struct mmap_struct *mmstrt = find_mmap_struct(mapid);
-      if (mmstrt)
-        remove_mmap (cur ,mmstrt);
-  }
   
   #ifdef USERPROG
   file_close(cur->executing_file);
   #endif
-  
+
+  int mapid = 0;
+  for(; mapid < cur->mm_struct->next_mapid; mapid++)
+  {
+    struct mmap_struct *mmstrt = find_mmap_struct(mapid);
+      if (mmstrt)
+        remove_mmap(cur ,mmstrt);
+  }
+
   free(cur->fd_table);
 
   // clear vm
@@ -710,24 +707,48 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
 
 void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
 {
-  struct list_elem *e;
-  for (e = list_begin (&mmapstrt->vma_list); e != list_end (&mmapstrt->vma_list); )
+  ASSERT(!lock_held_by_current_thread(&lru_lock));
+  lock_acquire(&lru_lock);
+  
+  struct list_elem *e = list_begin(&mmapstrt->vma_list);
+  void* temp_page = malloc(PGSIZE);
+  if(temp_page == NULL) NOT_REACHED();
+
+  ASSERT(!lock_held_by_current_thread(&filesys_lock));
+  lock_acquire(&filesys_lock);
+
+  for (; e != list_end (&mmapstrt->vma_list); )
   {
     struct vm_area_struct* vma = list_entry(e, struct vm_area_struct, mmap_elem);
-    if ((vma->loaded == PG_LOADED) && pagedir_is_dirty(curr->pagedir, vma->vaddr))
+    ASSERT(mmapstrt->file == vma->file);
+    if(pagedir_is_dirty(curr->pagedir, vma->vaddr))
     {
-      if (file_write_at(vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
-      {   NOT_REACHED (); }
-      free_vaddr_page(vma->vaddr);
+      if((vma->loaded == PG_LOADED))
+      {
+        if(file_write_at(vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
+        {   NOT_REACHED (); }
+      }
+      else if((vma->loaded == PG_SWAPED))
+      {
+        swap_in(vma->swap_slot, temp_page);
+        if(file_write_at(vma->file, temp_page, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
+        {   NOT_REACHED (); }
+      }
+      else NOT_REACHED();
+        
+      free_page(find_page_from_lru_list(pagedir_get_page(thread_current ()->pagedir, vma->vaddr)));
     }
     
     vma->loaded = PG_NOT_LOADED;
     e = list_remove(&vma->mmap_elem);
-    delete_vma(curr->mm_struct, vma); 
+    delete_vma(curr->mm_struct, vma);
   }
   file_close(mmapstrt->file);
+  lock_release(&filesys_lock);
   list_remove(&mmapstrt->mmap_elem);
   free(mmapstrt);
+  free(temp_page);
+  lock_release(&lru_lock);
 }
 
 
