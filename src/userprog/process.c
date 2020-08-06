@@ -525,9 +525,11 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp, const char* cmd_line) 
 {
-  struct page* kpage;
-  bool success = false;
+  ASSERT(!lock_held_by_current_thread(&lru_lock));
+  lock_acquire(&lru_lock);
 
+  struct page* kpage;
+  bool success = false;  
   kpage = allocate_page(PAL_USER | PAL_ZERO, NULL);
   
   success = install_page (((uint8_t*) PHYS_BASE) - PGSIZE, kpage->kaddr, true);
@@ -619,7 +621,8 @@ setup_stack (void **esp, const char* cmd_line)
       NOT_REACHED();
     }
     
- 
+  lock_release(&lru_lock);
+
   return success;
 }
 
@@ -663,6 +666,9 @@ bool load_file(void *kaddr, struct vm_area_struct *vma)
 
 bool allocate_vm_page_mm(struct vm_area_struct* vma)
 {
+  ASSERT(!lock_held_by_current_thread(&lru_lock));
+  lock_acquire(&lru_lock);
+
   struct page* kpage = allocate_page(PAL_USER, vma);
   ASSERT (kpage != NULL);
   ASSERT (pg_ofs (kpage->kaddr) == 0);
@@ -698,7 +704,7 @@ bool allocate_vm_page_mm(struct vm_area_struct* vma)
   }
   kpage->vma->loaded = PG_LOADED;
   add_page_lru(kpage);
-  
+  lock_release(&lru_lock);
   return true;
 }
 
@@ -710,7 +716,7 @@ void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
     struct vm_area_struct* vma = list_entry(e, struct vm_area_struct, mmap_elem);
     if ((vma->loaded == PG_LOADED) && pagedir_is_dirty(curr->pagedir, vma->vaddr))
     {
-      if (file_write_at (vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
+      if (file_write_at(vma->file, vma->vaddr, vma->read_bytes, vma->offset) != (int) vma->read_bytes)
       {   NOT_REACHED (); }
       free_vaddr_page(vma->vaddr);
     }
@@ -727,6 +733,9 @@ void remove_mmap(struct thread* curr, struct mmap_struct* mmapstrt)
 
 bool expand_stack(void* addr)
 {
+  ASSERT(!lock_held_by_current_thread(&lru_lock));
+  lock_acquire(&lru_lock);
+
   void* temp_addr = PHYS_BASE -PGSIZE;
   void* upage = pg_round_down(addr);
   
@@ -765,5 +774,6 @@ bool expand_stack(void* addr)
   else
     NOT_REACHED();
 
+  lock_release(&lru_lock);
   return true;
 }

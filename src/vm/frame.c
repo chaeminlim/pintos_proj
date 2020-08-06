@@ -32,9 +32,8 @@ void init_lru_list(void)
 
 void add_page_lru(struct page* page)
 {
-    lock_acquire(&lru_lock);
+    ASSERT(lock_held_by_current_thread(&lru_lock));
     list_push_back(&lru_list, &page->lru_elem);
-    lock_release(&lru_lock);
 }
 
 void delete_page_lru(struct page* page)
@@ -70,10 +69,10 @@ struct page* find_page_from_lru_list(void *kaddr)
 // swap
 void swap_pages()
 {
-    ASSERT(lru_lock.holder != thread_current());
-    lock_acquire(&lru_lock);
+    ASSERT(lock_held_by_current_thread(&lru_lock));
     ASSERT(thread_current()->tid < MAX_SWAP);
     IN_SWAP_PAGES[thread_current()->tid] = true;
+
     struct page *victim = get_victim();
     //victim->vma->pinned = true;
     ASSERT (victim != NULL);
@@ -125,7 +124,6 @@ void swap_pages()
     }
     free_page(victim);
     IN_SWAP_PAGES[thread_current()->tid] = false;
-    lock_release(&lru_lock);
 }
 
 struct list_elem * get_next_lru_clock (void)
