@@ -19,7 +19,6 @@ struct buffer_cache_entry
 void init_buffer_cache(void);
 void block_buffer_read(struct block *block, block_sector_t sector, void *buffer);
 void block_buffer_write(struct block *block, block_sector_t sector, const void *buffer);
-void write_back(struct buffer_cache_entry* bce);
 void remove_buffer_cache(void);
 
 #endif

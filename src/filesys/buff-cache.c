@@ -12,6 +12,7 @@ int bce_clock = -1;
 bool is_full = false;
 int reader_count = 0;
 
+void write_back(struct buffer_cache_entry* bce);
 int find_in_cache(struct block* block, block_sector_t t);
 int clock_buffer(void);
 
