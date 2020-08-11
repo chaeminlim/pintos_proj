@@ -9,12 +9,11 @@
 #include "filesys/buff-cache.h"
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
-
 #define DIRECT_BLOCK_NUM 123
 #define INDIRECT_BLOCK_NUM 128
 #define DOUBLE_INDIRECT_BLOCK_NUM 16384
 
-static char ZERO_BLOCK[BLOCK_SECTOR_SIZE];
+static uint8_t ZERO_BLOCK[BLOCK_SECTOR_SIZE] = {0};
 
 struct indirect_block
 {
@@ -120,9 +119,10 @@ bool allocate_new_double_indirect_disk(struct inode_disk* disk_inode, size_t nee
 bool allocate_new_direct_disk(struct inode_disk* disk_inode, size_t needed_blocks, bool extend)
 {
   size_t i;
+  if(!extend) memset(disk_inode->direct_blocks, NABLOCK, sizeof(disk_inode->direct_blocks));
   for(i = 0; i < needed_blocks; i++)
   {
-    if(disk_inode->direct_blocks[i] == 0)
+    if(disk_inode->direct_blocks[i] == NABLOCK)
     {
       if(!free_map_allocate(1, &(disk_inode->direct_blocks[i]))) return false;
       block_buffer_write(fs_device, disk_inode->direct_blocks[i], ZERO_BLOCK);
@@ -143,7 +143,7 @@ bool allocate_new_indirect_disk(block_sector_t* sector, size_t needed_blocks, bo
   if(!extend)
   {
     if(!free_map_allocate(1, sector)) return false;
-    memset(&indi_block, 0, sizeof(indi_block));
+    memset(&indi_block, NABLOCK, sizeof(indi_block));
   }  
   else block_buffer_read(fs_device, *sector, &indi_block);
   
@@ -151,7 +151,7 @@ bool allocate_new_indirect_disk(block_sector_t* sector, size_t needed_blocks, bo
 
   for(i = 0; i < needed_blocks; i++)
   {
-    if(indi_block.blocks[i] == 0)
+    if(indi_block.blocks[i] == NABLOCK)
     {
       if(!free_map_allocate(1, &indi_block.blocks[i])) return false;
       block_buffer_write(fs_device, indi_block.blocks[i], ZERO_BLOCK);
@@ -175,7 +175,7 @@ bool allocate_new_double_indirect_disk(struct inode_disk* disk_inode, size_t nee
   if(!extend)
   {
     if(!free_map_allocate(1, &disk_inode->double_indirect_blocks)) return false;
-    memset(&double_indi_block, 0, sizeof(double_indi_block));
+    memset(&double_indi_block, NABLOCK, sizeof(double_indi_block));
   }
   else block_buffer_read(fs_device, disk_inode->double_indirect_blocks, &double_indi_block);
 
@@ -198,24 +198,24 @@ bool allocate_inode_disk(struct inode_disk* disk_inode, off_t length, bool exten
   
   size_t sector_num = bytes_to_sectors(length); // 필요한 섹터의 개수
   size_t temp_sector = (sector_num < DIRECT_BLOCK_NUM ? sector_num : DIRECT_BLOCK_NUM);
-
+  // direct disk에 할당
   if(!allocate_new_direct_disk(disk_inode, temp_sector, extend)) PANIC("allocate direct block fail!");
-
+  // 할당 끝나면 변수 업데이트
+  if(sector_num < temp_sector) NOT_REACHED();
   sector_num -= temp_sector;
   if(sector_num == 0) return true;
-
   // indirect level allocation
   temp_sector = (sector_num < INDIRECT_BLOCK_NUM ? sector_num : INDIRECT_BLOCK_NUM);
-
+  // indirect 할당
   if(!allocate_new_indirect_disk(&(disk_inode->indirect_blocks), temp_sector, extend)) PANIC("allocate indirect block fail!");
   
+  if(sector_num < temp_sector) NOT_REACHED();
   sector_num -= temp_sector;
   if(sector_num == 0) return true;
-
   if(sector_num > DOUBLE_INDIRECT_BLOCK_NUM) PANIC("Over size error!");
   // allocate double indirect
   temp_sector = (sector_num < DOUBLE_INDIRECT_BLOCK_NUM ? sector_num : DOUBLE_INDIRECT_BLOCK_NUM); // 할당해야 하는 전체 블럭 수
-  
+  // double indirect 할당
   if(!allocate_new_double_indirect_disk(disk_inode, temp_sector, extend)) PANIC("allocate double indirect block fail!");
   return true;
 }
@@ -231,7 +231,8 @@ bool free_inode_disk(struct inode_disk* disk_inode)
   size_t temp_sector = (sector_num < DIRECT_BLOCK_NUM ? sector_num : DIRECT_BLOCK_NUM);
   for(i = 0; i < temp_sector; i++)
   {
-    free_map_release(disk_inode->direct_blocks[temp_sector], 1);
+    if(disk_inode->direct_blocks[i] == NABLOCK) PANIC("FREE NOT ALLOCATED BLOCK");
+    free_map_release(disk_inode->direct_blocks[i], 1);
   }
   sector_num -= temp_sector;
   if(sector_num == 0) return true;
@@ -396,7 +397,7 @@ inode_close (struct inode *inode)
       if (inode->removed) 
         {
           free_map_release (inode->sector, 1);
-          if(free_inode_disk(&inode->data)) NOT_REACHED();
+          if(!free_inode_disk(&inode->data)) NOT_REACHED();
         }
 
       free (inode); 
@@ -514,8 +515,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
         {
           /* Write full sector directly to disk. */
-          //block_write (fs_device, sector_idx, buffer + bytes_written);
-          
           block_buffer_write(fs_device, sector_idx, buffer + bytes_written);
         }
       else 

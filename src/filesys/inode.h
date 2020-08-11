@@ -1,6 +1,6 @@
 #ifndef FILESYS_INODE_H
 #define FILESYS_INODE_H
-
+#define NABLOCK -1u
 #include <stdbool.h>
 #include "filesys/off_t.h"
 #include "devices/block.h"

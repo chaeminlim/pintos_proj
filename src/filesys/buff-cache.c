@@ -1,4 +1,5 @@
 #include "filesys/buff-cache.h"
+#include "filesys/inode.h"
 #include "threads/synch.h"
 #include <stdio.h>
 #include <string.h>
@@ -35,6 +36,7 @@ void init_buffer_cache(void)
 
 void block_buffer_read(struct block *block, block_sector_t sector, void *buffer)
 {
+    if(sector == NABLOCK) PANIC("READ ON NABLOCK");
     sema_down(&buffer_cache_reader_sema);
     reader_count++; if(reader_count == 1) sema_down(&buffer_cache_writer_sema);
     sema_up(&buffer_cache_reader_sema);
@@ -65,6 +67,7 @@ void block_buffer_read(struct block *block, block_sector_t sector, void *buffer)
 
 void block_buffer_write(struct block *block, block_sector_t sector, const void *buffer)
 {
+    if(sector == NABLOCK) PANIC("WRITE ON NABLOCK");
     sema_down(&buffer_cache_writer_sema);
     int buffer_index = find_in_cache(block, sector);
     if(buffer_index == -1) //not found
@@ -102,6 +105,7 @@ void remove_buffer_cache(void)
 
 void write_back(struct buffer_cache_entry* bce)
 {
+    if(bce->disk_sector_num == NABLOCK) PANIC("NOT allowed disk sector");
     block_write(bce->block_device, bce->disk_sector_num, bce->block);
     bce->dirty = false;
 }
@@ -136,14 +140,14 @@ int clock_buffer(void)
                 break;   
         }
     }
+
     if(Buffer_Cache[bce_clock].dirty == true)
     {
         if(Buffer_Cache[bce_clock].valid == true) write_back(&Buffer_Cache[bce_clock]);
     }
     
-    Buffer_Cache[bce_clock].accessed = false;
+    Buffer_Cache[bce_clock].accessed = true;
     Buffer_Cache[bce_clock].dirty = false;
-    Buffer_Cache[bce_clock].valid = false;
     
     return bce_clock;
 }

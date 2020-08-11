@@ -194,7 +194,7 @@ syscall_handler (struct intr_frame *f)
     }
     default:
     {
-      exit(-1);
+      PANIC("NOT ALLOWED SYSCALL NUMBER %d", syscall_number);
     }
   }
 }
