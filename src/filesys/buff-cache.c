@@ -4,6 +4,7 @@
 #include <string.h>
 #include "lib/debug.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 
 struct semaphore buffer_cache_writer_sema;
 struct semaphore buffer_cache_reader_sema;
@@ -18,9 +19,9 @@ int clock_buffer(void);
 
 void init_buffer_cache(void)
 {
-    /* sema_init(&buffer_cache_writer_sema, 1);
+    sema_init(&buffer_cache_writer_sema, 1);
     sema_init(&buffer_cache_reader_sema, 1);
-     */
+    
     int i = 0;
     for(; i < BUFFER_CACHE_SIZE; i++)
     {
@@ -34,10 +35,10 @@ void init_buffer_cache(void)
 
 void block_buffer_read(struct block *block, block_sector_t sector, void *buffer)
 {
-    /* sema_down(&buffer_cache_reader_sema);
+    sema_down(&buffer_cache_reader_sema);
     reader_count++; if(reader_count == 1) sema_down(&buffer_cache_writer_sema);
-    sema_up(&buffer_cache_reader_sema); */
-
+    sema_up(&buffer_cache_reader_sema);
+    
     int buffer_index = find_in_cache(block, sector);
     if(buffer_index == -1) //not found
     {
@@ -56,15 +57,15 @@ void block_buffer_read(struct block *block, block_sector_t sector, void *buffer)
     memcpy(buffer, Buffer_Cache[buffer_index].block, BLOCK_SECTOR_SIZE); 
     Buffer_Cache[buffer_index].accessed = true;
     
-    /* sema_down(&buffer_cache_reader_sema);
+    sema_down(&buffer_cache_reader_sema);
     reader_count--; if(reader_count == 0) sema_up(&buffer_cache_writer_sema);
     sema_up(&buffer_cache_reader_sema);
-     */
+    
 }
 
 void block_buffer_write(struct block *block, block_sector_t sector, const void *buffer)
 {
-    /* sema_down(&buffer_cache_writer_sema); */
+    sema_down(&buffer_cache_writer_sema);
     int buffer_index = find_in_cache(block, sector);
     if(buffer_index == -1) //not found
     {
@@ -83,12 +84,12 @@ void block_buffer_write(struct block *block, block_sector_t sector, const void *
     memcpy(Buffer_Cache[buffer_index].block, buffer, BLOCK_SECTOR_SIZE); 
     Buffer_Cache[buffer_index].accessed = true;
     Buffer_Cache[buffer_index].dirty = true;
-    /* sema_up(&buffer_cache_writer_sema); */
+    sema_up(&buffer_cache_writer_sema);
 }
 
 void remove_buffer_cache(void)
 {
-    /* sema_down(&buffer_cache_writer_sema); */
+    sema_down(&buffer_cache_writer_sema);
     int i = 0;
     for(; i < BUFFER_CACHE_SIZE; i++)
     {
@@ -96,7 +97,7 @@ void remove_buffer_cache(void)
             if(Buffer_Cache[i].dirty)
                 write_back(&Buffer_Cache[i]);
     }
-    /* sema_up(&buffer_cache_writer_sema); */
+    sema_up(&buffer_cache_writer_sema);
 }
 
 void write_back(struct buffer_cache_entry* bce)

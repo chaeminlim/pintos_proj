@@ -70,12 +70,12 @@ free_map_close (void)
 /* Creates a new free map file on disk and writes the free map to
    it. */
 void
-free_map_create (void) 
+free_map_create (void) // error point
 {
   /* Create inode. */
+  
   if (!inode_create (FREE_MAP_SECTOR, bitmap_file_size (free_map)))
     PANIC ("free map creation failed");
-
   /* Write bitmap to file. */
   free_map_file = file_open (inode_open (FREE_MAP_SECTOR));
   if (free_map_file == NULL)

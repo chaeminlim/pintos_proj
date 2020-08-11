@@ -27,6 +27,7 @@ filesys_init (bool format)
   inode_init ();
   free_map_init ();
 
+  
   if (format) 
     do_format ();
 
@@ -58,7 +59,6 @@ filesys_create (const char *name, off_t initial_size)
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);
   dir_close (dir);
-
   return success;
 }
 
