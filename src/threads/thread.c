@@ -554,7 +554,7 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->sema_wait, 0);
   sema_init(&t->sema_load, 0);
   t->load_status = false;
-  
+  t->current_dir = NULL;
   // vm
   #ifdef USERPROG
   t->executing_file = NULL;

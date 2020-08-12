@@ -4,6 +4,7 @@
         "string_view": "c",
         "hash_map": "c",
         "hash_set": "c",
-        "initializer_list": "c"
+        "initializer_list": "c",
+        "typeinfo": "c"
     }
 }

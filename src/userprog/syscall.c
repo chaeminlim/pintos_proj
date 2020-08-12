@@ -34,6 +34,12 @@ void is_string_safe(char* str);
 void is_buffer_safe(void* buffer, unsigned int size);
 void unpin_page_string(char* str);
 void unpin_page_buffer(void* buffer, unsigned int size);
+// filesys
+bool readdir(int fd, char* name);
+bool mkdir(const char* dir);
+bool chdir(const char* dir);
+bool isdir(int fd);
+int inumber(int fd);
 
 mapid_t mmap(int fd, void *addr);
 void munmap(mapid_t mapping);
@@ -192,6 +198,39 @@ syscall_handler (struct intr_frame *f)
       munmap(mapid);
       break;
     }
+    //#ifdef FILESYS
+    case SYS_CHDIR:
+    {
+      PANIC("NOT ALLOWED SYSCALL NUMBER %d", syscall_number);
+      break;
+    }
+    case SYS_MKDIR:
+    {
+      PANIC("NOT ALLOWED SYSCALL NUMBER %d", syscall_number);
+      break;
+    }
+    case SYS_READDIR:
+    {
+      is_safe_addr(f->esp + 8);
+      is_safe_addr(f->esp + 4);
+      void* str = (char*)*((int*)f->esp + 2);
+      int fd = *(int*)(f->esp+4);
+      is_string_safe(str);
+      int fd = *(int*)(f->esp+4);
+      f->eax = readdir(fd, str);
+      break;
+    }
+    case SYS_ISDIR:
+    {
+      PANIC("NOT ALLOWED SYSCALL NUMBER %d", syscall_number);
+      break;
+    }
+    case SYS_INUMBER:
+    {
+      PANIC("NOT ALLOWED SYSCALL NUMBER %d", syscall_number);
+      break;
+    }
+    //#endif
     default:
     {
       PANIC("NOT ALLOWED SYSCALL NUMBER %d", syscall_number);
@@ -527,3 +566,27 @@ void munmap(mapid_t mapping)
   remove_mmap(thread_current(), mmapstrt);
 }
 
+bool readdir(int fd, char* name)
+{
+  return false;
+}
+
+bool mkdir(const char* dir)
+{
+  return false;
+}
+
+bool chdir(const char* dir)
+{
+  return false;
+}
+
+bool isdir(int fd)
+{
+  return false;
+}
+
+int inumber(int fd)
+{
+  return -1;
+}

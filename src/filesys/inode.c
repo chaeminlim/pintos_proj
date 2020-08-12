@@ -31,7 +31,7 @@ struct inode_disk
     block_sector_t direct_blocks[DIRECT_BLOCK_NUM]; // index 0 ~ 122
     block_sector_t indirect_blocks; // index 123 ~ 250
     block_sector_t double_indirect_blocks; // index 251 ~ 16,635
-    bool dir;
+    bool is_dir;
     off_t length;                       /* File size in bytes.*/
     unsigned magic;                     /* Magic number. */
   };
@@ -293,7 +293,7 @@ bool inode_extend(struct inode_disk* disk_inode,  off_t length)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, bool is_dir)
 {
   //printf("sector %u, length %d\n\n", sector, length);
   struct inode_disk *disk_inode = NULL;
@@ -309,6 +309,7 @@ inode_create (block_sector_t sector, off_t length)
   {
     disk_inode->length = length;
     disk_inode->magic = INODE_MAGIC;
+    disk_inode->is_dir = is_dir;
     if(allocate_inode_disk(disk_inode, length, false))
     {
       block_buffer_write(fs_device, sector, disk_inode);
