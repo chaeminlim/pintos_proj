@@ -83,16 +83,6 @@ start_process (void *file_name_)
 
   t->load_status = load(file_name, &if_.eip, &if_.esp);
   
-  // setting dir
-  if(t->parent != NULL && t->parent->current_dir != NULL)
-  {
-    t->current_dir = dir_reopen(t->parent->current_dir);
-  } 
-  else
-  {
-    t->current_dir = dir_open_root();
-  }
-
   /* If load failed, quit. */
   //hex_dump( if_.esp,  if_.esp, PHYS_BASE -  if_.esp, true);
   sema_up(&t->sema_load); // 부모의 exec을 재개 시킨다
@@ -156,9 +146,7 @@ process_exit (void)
       file_close(cur->fd_table[i]);
     }
   }
-  // close dir
-  if(cur->current_dir) dir_close(cur->current_dir);
-
+  
   #ifdef USERPROG
   file_close(cur->executing_file);
   #endif
@@ -193,6 +181,10 @@ process_exit (void)
   cur->exit_status = true;
   
   sema_down(&cur->sema_exit);
+
+  // close dir
+  if(cur->current_dir) dir_close(cur->current_dir);
+  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;

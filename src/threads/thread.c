@@ -196,6 +196,7 @@ thread_create (const char *name, int priority,
   tid = t->tid = allocate_tid ();
   t->parent = curr;
   list_push_back(&curr->child_list, &t->child_list_elem);
+  
   #ifdef USERPROG
   
   //t->fd_table = palloc_get_page (PAL_ZERO);
@@ -212,6 +213,18 @@ thread_create (const char *name, int priority,
   t->mm_struct = malloc(sizeof(struct mm_struct));
   list_init(&t->mm_struct->mmap_list);
   t->mm_struct->next_mapid = 0;
+  #endif
+  
+  #ifdef FILESYS
+  // setting dir
+  if(t->parent != NULL && t->parent->current_dir != NULL)
+  {
+    t->current_dir = dir_reopen(t->parent->current_dir);
+  } 
+  else
+  {
+    t->current_dir = dir_open_root();
+  }
   #endif
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 

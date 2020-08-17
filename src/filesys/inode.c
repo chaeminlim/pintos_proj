@@ -81,7 +81,7 @@ byte_to_sector (const struct inode *inode, off_t pos)
       block_buffer_read(fs_device, inode->data.indirect_blocks, &indi_block);
       return indi_block.blocks[sector_num];
     }
-    else if(sector_num >= 251 && sector_num <= 16636)
+    else if(sector_num >= 251 && sector_num <= 16635)
     {
       sector_num -= 251; // 0 ~
       size_t indirect_block_num = sector_num / INDIRECT_BLOCK_NUM;
