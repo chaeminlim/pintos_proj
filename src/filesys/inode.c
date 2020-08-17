@@ -405,6 +405,11 @@ inode_close (struct inode *inode)
     }
 }
 
+bool inode_removed(struct inode* inode)
+{
+  ASSERT (inode != NULL);
+  return(inode->removed); 
+}
 /* Marks INODE to be deleted when it is closed by the last caller who
    has it open. */
 void

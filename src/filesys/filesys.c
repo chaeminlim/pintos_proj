@@ -44,6 +44,7 @@ filesys_done (void)
   free_map_close ();
 }
 
+
 /* Creates a file named NAME with the given INITIAL_SIZE.
    Returns true if successful, false otherwise.
    Fails if a file named NAME already exists,
@@ -52,7 +53,11 @@ bool
 filesys_create (const char *name, off_t initial_size) 
 {
   block_sector_t inode_sector = 0;
-  struct dir *dir = dir_open_root ();
+
+  char directory_str[strlen(name)+1];
+  char file_name_str[strlen(name)+1];
+  divide_path_str(name, directory_str, file_name_str);
+  struct dir *dir = get_dir_from_path(directory_str);
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector)
                   && inode_create (inode_sector, initial_size, false)
@@ -71,13 +76,17 @@ filesys_create (const char *name, off_t initial_size)
 struct file *
 filesys_open (const char *name)
 {
-  struct dir *dir = dir_open_root ();
+  char directory_str[strlen(name)+1];
+  char file_name_str[strlen(name)+1];
+  divide_path_str(name, directory_str, file_name_str);
+  struct dir *dir = get_dir_from_path(directory_str);
   struct inode *inode = NULL;
-
+  
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
-  dir_close (dir);
 
+  dir_close (dir);
+ 
   return file_open (inode);
 }
 
@@ -88,7 +97,10 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
-  struct dir *dir = dir_open_root ();
+  char directory_str[strlen(name)+1];
+  char file_name_str[strlen(name)+1];
+  divide_path_str(name, directory_str, file_name_str);
+  struct dir *dir = get_dir_from_path(directory_str);
   bool success = dir != NULL && dir_remove (dir, name);
   dir_close (dir); 
 

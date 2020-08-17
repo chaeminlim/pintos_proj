@@ -5,7 +5,7 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
-
+#include "threads/thread.h"
 /* A directory. */
 struct dir 
   {
@@ -232,4 +232,77 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
         } 
     }
   return false;
+}
+
+
+void divide_path_str(const char* name, char* directory, char* file_name)
+{
+  int length = strlen(name);
+  if(length <= 0) NOT_REACHED();
+  bool end_with_slash = (name[length-1] == '/');
+  int back_start_index = end_with_slash ? length : length - 1;
+  bool flag = false;
+  for(; back_start_index >= 0; back_start_index--)
+  {
+    if(name[back_start_index] == '/')
+    {
+      flag = true;
+      break;
+    }
+  }
+  if(!flag) NOT_REACHED();
+
+  memcpy(directory, name, back_start_index + 1);
+  directory[back_start_index + 1] = '\0';
+  memcpy(file_name, name + (back_start_index + 1), length - back_start_index - 1);
+  file_name[length - back_start_index] = '\0';  
+}
+
+struct dir* get_dir_from_path(const char* directory)
+{
+  if(strlen(directory) <= 0) NOT_REACHED();
+  int length = strlen(directory);
+  char temp_dir[length+1];
+  strlcpy(temp_dir, directory, length + 1);
+  bool is_absolute = (directory[0] == '/');
+  struct dir* current = NULL;
+  
+  if(is_absolute)
+    current = dir_open_root();
+  else
+  {
+    if(thread_current()->current_dir == NULL)
+      current = dir_open_root();
+    else
+      current = dir_reopen(thread_current()->current_dir);
+  }
+  // set current done
+  char* token, *save_ptr;
+  for(token = strtok_r(temp_dir, "/", &save_ptr); token != NULL; token = strtok_r(NULL, "/", &save_ptr))
+  {
+    struct inode* inode = NULL;
+    if(!dir_lookup(current, token, &inode))
+    {
+      dir_close(current);
+      return NULL;
+    }
+    else
+    {
+      struct dir* next = dir_open(inode);
+      if(next == NULL)
+      {
+        dir_close(current); 
+        return NULL;
+      }
+      dir_close(current);
+      current = next;
+    }
+  }
+
+  if(inode_removed(dir_get_inode(current)))
+  {
+    dir_close(current);
+    return NULL;
+  }
+  return current; 
 }

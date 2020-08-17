@@ -216,7 +216,6 @@ syscall_handler (struct intr_frame *f)
       void* str = (char*)*((int*)f->esp + 2);
       int fd = *(int*)(f->esp+4);
       is_string_safe(str);
-      int fd = *(int*)(f->esp+4);
       f->eax = readdir(fd, str);
       break;
     }
