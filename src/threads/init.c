@@ -104,7 +104,6 @@ main (void)
   palloc_init (user_page_limit);
   malloc_init ();
   paging_init ();
-
   /* Segmentation. */
 #ifdef USERPROG
   tss_init ();
@@ -121,8 +120,6 @@ main (void)
   syscall_init ();
   
 #endif
-  
-  
   /* Start thread scheduler and enable interrupts. */
   thread_start ();
   serial_init_queue ();
@@ -132,6 +129,7 @@ main (void)
   /* Initialize file system. */
   ide_init ();
   locate_block_devices ();
+  
   filesys_init (format_filesys);
   
 #endif
@@ -140,7 +138,6 @@ main (void)
   init_lru_list();
   swap_init();
 #endif
-  
   
   
   printf ("Boot complete.\n");

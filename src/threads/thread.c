@@ -120,7 +120,6 @@ thread_start (void)
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
-  
   load_avg = LOAD_AVG_NORMAL;
   /* Start preemptive thread scheduling. */
   intr_enable ();
@@ -194,11 +193,13 @@ thread_create (const char *name, int priority,
     return TID_ERROR;
 
   /* Initialize thread. */
+  
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
   t->parent = curr;
   list_push_back(&curr->child_list, &t->child_list_elem);
   
+   
   #ifdef USERPROG
   
   //t->fd_table = palloc_get_page (PAL_ZERO);
@@ -217,17 +218,6 @@ thread_create (const char *name, int priority,
   t->mm_struct->next_mapid = 0;
   #endif
   
-  #ifdef FILESYS
-  // setting dir
-  if(t->parent != NULL && t->parent->current_dir != NULL)
-  {
-    t->current_dir = dir_reopen(t->parent->current_dir);
-  } 
-  else
-  {
-    t->current_dir = dir_open_root();
-  }
-  #endif
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */

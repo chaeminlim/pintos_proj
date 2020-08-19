@@ -83,6 +83,17 @@ start_process (void *file_name_)
 
   t->load_status = load(file_name, &if_.eip, &if_.esp);
   
+  #ifdef FILESYS
+  // setting dir
+  if(t->parent != NULL && t->parent->current_dir != NULL)
+  {
+    t->current_dir = dir_reopen(t->parent->current_dir);
+  } 
+  else
+  {
+    t->current_dir = dir_open_root();
+  }
+  #endif
   /* If load failed, quit. */
   //hex_dump( if_.esp,  if_.esp, PHYS_BASE -  if_.esp, true);
   sema_up(&t->sema_load); // 부모의 exec을 재개 시킨다

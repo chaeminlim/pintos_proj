@@ -26,6 +26,20 @@ struct dir_entry
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
+  /* bool status = inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
+  if(!status) return false;
+
+  struct dir* dir = dir_open(inode_open(sector));
+  if(dir == NULL) NOT_REACHED();
+  struct dir_entry* entry;
+  entry->inode_sector = sector;
+
+  if(inode_write_at(dir->inode, &entry, sizeof(entry), 0) != sizeof(entry))
+  {
+    status = false;
+  }
+  dir_close(dir);
+  return status; */
   return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
 }
 
@@ -123,7 +137,18 @@ dir_lookup (const struct dir *dir, const char *name, struct inode **inode)
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  if (lookup (dir, name, &e, NULL))
+  if(strcmp(name, ".") == 0)
+  {
+    *inode = inode_reopen(dir->inode);
+    if(inode == NULL) NOT_REACHED();
+  }
+  else if(strcmp(name, "..") == 0)
+  {
+    inode_read_at(dir->inode, &e, sizeof(e), 0);
+    *inode = inode_open(e.inode_sector);
+    if(inode == NULL) NOT_REACHED();
+  }
+  else if (lookup (dir, name, &e, NULL))
     *inode = inode_open (e.inode_sector);
   else
     *inode = NULL;
@@ -138,7 +163,7 @@ dir_lookup (const struct dir *dir, const char *name, struct inode **inode)
    Fails if NAME is invalid (i.e. too long) or a disk or memory
    error occurs. */
 bool
-dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
+dir_add (struct dir *dir, const char *name, block_sector_t inode_sector, bool is_dir)
 {
   struct dir_entry e;
   off_t ofs;
@@ -154,6 +179,18 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   /* Check that NAME is not in use. */
   if (lookup (dir, name, NULL, NULL))
     goto done;
+
+  // 자식을 만들 떄, 부모로서 설정해준다.
+  if(is_dir)
+  {
+    struct dir* child_dir = dir_open(inode_open(inode_sector));
+    if(child_dir == NULL) NOT_REACHED();
+    e.inode_sector = inode_get_inumber(dir_get_inode(dir));
+    if(inode_write_at(child_dir->inode, &e, sizeof(e), 0) != sizeof(e))
+      NOT_REACHED();
+    dir_close(dir);
+  }
+
 
   /* Set OFS to offset of free slot.
      If there are no free slots, then it will be set to the
@@ -238,7 +275,12 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 void divide_path_str(const char* name, char* directory, char* file_name)
 {
   int length = strlen(name);
-  if(length <= 0) NOT_REACHED();
+  if(length <= 0)
+  {
+    directory[0] = '\0';
+    file_name[0] = '\0'; 
+    return; 
+  }
   bool end_with_slash = (name[length-1] == '/');
   int back_start_index = end_with_slash ? length : length - 1;
   bool flag = false;
@@ -250,22 +292,42 @@ void divide_path_str(const char* name, char* directory, char* file_name)
       break;
     }
   }
-  if(!flag) NOT_REACHED();
-
-  memcpy(directory, name, back_start_index + 1);
-  directory[back_start_index + 1] = '\0';
-  memcpy(file_name, name + (back_start_index + 1), length - back_start_index - 1);
-  file_name[length - back_start_index] = '\0';  
+  if(flag)
+  {
+    memcpy(directory, name, back_start_index + 1);
+    directory[back_start_index + 1] = '\0';
+    memcpy(file_name, name + (back_start_index + 1), length - back_start_index - 1);
+    file_name[length - back_start_index] = '\0';  
+  }
+  else // just name
+  {
+    directory[0] = '\0';
+    memcpy(file_name, name, length);
+    file_name[length + 1] = '\0';
+  }
 }
 
 struct dir* get_dir_from_path(const char* directory)
 {
-  if(strlen(directory) <= 0) NOT_REACHED();
+  struct dir* current = NULL;
   int length = strlen(directory);
   char temp_dir[length+1];
+
+  if(length < 0) NOT_REACHED();
+  if(length == 0)
+  {
+    if(thread_current()->current_dir == NULL)
+      current = dir_open_root();
+    else
+      current = dir_reopen(thread_current()->current_dir);
+    return current;
+  }
+  
+  
+  
   strlcpy(temp_dir, directory, length + 1);
   bool is_absolute = (directory[0] == '/');
-  struct dir* current = NULL;
+  
   
   if(is_absolute)
     current = dir_open_root();
