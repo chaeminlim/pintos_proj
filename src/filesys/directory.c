@@ -26,21 +26,20 @@ struct dir_entry
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
-  /* bool status = inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
+  bool status = inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
   if(!status) return false;
 
   struct dir* dir = dir_open(inode_open(sector));
   if(dir == NULL) NOT_REACHED();
-  struct dir_entry* entry;
-  entry->inode_sector = sector;
-
-  if(inode_write_at(dir->inode, &entry, sizeof(entry), 0) != sizeof(entry))
+  struct dir_entry entry;
+  entry.inode_sector = sector;
+  if(inode_write_at(dir->inode, &entry, sizeof(struct dir_entry), 0) != sizeof(struct dir_entry))
   {
     status = false;
   }
   dir_close(dir);
-  return status; */
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
+  return status; 
+  //return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
 }
 
 /* Opens and returns the directory for the given INODE, of which
