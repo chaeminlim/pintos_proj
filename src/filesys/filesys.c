@@ -56,6 +56,8 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   char directory_str[strlen(name)+1];
   char file_name_str[strlen(name)+1];
   divide_path_str(name, directory_str, file_name_str);
+/*   printf("DIR %s, size %d\n", directory_str, strlen(directory_str));
+  printf("FIL %s, size %d\n", file_name_str, strlen(file_name_str)); */
   struct dir *dir = get_dir_from_path(directory_str);
   bool success;
 
@@ -98,6 +100,9 @@ filesys_open (const char *name)
   char directory_str[strlen(name)+1];
   char file_name_str[strlen(name)+1];
   divide_path_str(name, directory_str, file_name_str);
+  /* 
+  printf("DIR %s, size %d\n", directory_str, strlen(directory_str));
+  printf("FIL %s, size %d\n", file_name_str, strlen(file_name_str)); */
   struct dir *dir = get_dir_from_path(directory_str);
   struct inode *inode = NULL;
   if(dir == NULL) return NULL;
@@ -107,20 +112,12 @@ filesys_open (const char *name)
     dir_lookup(dir, file_name_str, &inode);
     dir_close(dir);
   }
-  else 
-  {
-    return NULL;
-    //inode = dir_get_inode(dir);
-  }
-
-  if (inode == NULL || inode_removed(inode))
+  if (inode == NULL || 
+      inode_removed(inode) || 
+      !(strlen(file_name_str) > 0) ||
+      inode_is_dir(inode))
   {
     return NULL; 
-  }
-
-  if(inode_is_dir(inode))
-  {
-    return NULL;
   }
   return file_open (inode);
 }
@@ -132,16 +129,56 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
+  /* printf("REMOVE !!! %s\n", name); */
   char directory_str[strlen(name)+1];
   char file_name_str[strlen(name)+1];
   divide_path_str(name, directory_str, file_name_str);
+  /* printf("DIR %s, size %d\n", directory_str, strlen(directory_str));
+  printf("FIL %s, size %d\n", file_name_str, strlen(file_name_str)); */
   if(strcmp(file_name_str, "..") == 0 || strcmp(file_name_str, ".") == 0) return false;
-
   struct dir *dir = get_dir_from_path(directory_str);
-  bool success = dir != NULL && dir_remove (dir, name);
-  dir_close (dir); 
+  struct inode* inode = NULL;
+  bool success;
 
-  return success;
+  if (strlen(file_name_str) > 0) 
+  {
+    if(!dir_lookup(dir, file_name_str, &inode))
+    {
+      printf("REMOVE !!! %s\n", name);
+      printf("DIR %s, size %d\n", directory_str, strlen(directory_str));
+      printf("FIL %s, size %d\n", file_name_str, strlen(file_name_str));
+      
+      dir_close(dir);
+      return false;
+    }
+
+    if(inode_is_dir(inode)) // dir일때
+    {
+      struct dir* t_dir = dir_open(inode);
+      if(inode_open_count(dir_get_inode(t_dir)) > 2)
+      {
+        //printf("open %d.\n", inode_open_count(dir_get_inode(dir)));
+        dir_close(dir);
+        dir_close(t_dir);
+        return false;
+      }
+      else
+      {
+        dir_close(t_dir);
+        success = dir_remove(dir, file_name_str);
+        dir_close(dir);
+        return success;
+      }
+    }
+    else
+    {
+      success = dir != NULL && dir_remove(dir, file_name_str);
+      dir_close(dir);
+      return success;
+    }
+  }
+  dir_close(dir);
+  return false;
 }
 
 /* Formats the file system. */

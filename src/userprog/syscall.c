@@ -66,7 +66,6 @@ syscall_handler (struct intr_frame *f)
 { 
   int syscall_number = *(int*)(f->esp);
   //printf ("system call! number: %d\n", syscall_number);
-  
   switch(syscall_number)
   {
     case SYS_HALT:
@@ -104,7 +103,6 @@ syscall_handler (struct intr_frame *f)
       is_safe_addr(f->esp + 8);
       char* file = (char*)*((int*)f->esp + 1);
       is_string_safe(file);
-      
       unsigned int initial_size = *(unsigned int*)(f->esp + 8);
       f->eax = create(file, initial_size);
       unpin_page_string(file);
@@ -227,6 +225,9 @@ syscall_handler (struct intr_frame *f)
       int fd = *(int*)(f->esp+4);
       is_string_safe(str);
       f->eax = readdir(fd, str);
+      //printf("RESULT %d\n", f->eax);
+      //printf("RESULT %s\n\n", str);
+      
       break;
     }
     case SYS_ISDIR:
@@ -241,6 +242,7 @@ syscall_handler (struct intr_frame *f)
       is_safe_addr(f->esp + 4);
       int fd = *(int*)(f->esp+4);
       f->eax = inumber(fd);
+      //printf("INUMBER %d fd %d\n", f->eax, fd);
       break;
     }
     //#endif
@@ -258,7 +260,7 @@ void halt(void)
 
 void exit(int status)
 {
-  thread_current ()->exit_code = status;
+  thread_current()->exit_code = status;
   printf("%s: exit(%d)\n", thread_current()->name, status);
   thread_exit();
 }
@@ -282,13 +284,18 @@ int wait(tid_t tid)
 
 bool create(const char* file, unsigned initial_size)
 {
-
-  return filesys_create(file, initial_size, false);
+  lock_acquire(&filesys_lock);
+  bool result = filesys_create(file, initial_size, false);
+  lock_release(&filesys_lock);
+  return result;
 }
 
 bool remove(const char* file)
 {
-  return filesys_remove(file);
+  lock_acquire(&filesys_lock);
+  bool result = filesys_remove(file);
+  lock_release(&filesys_lock);
+  return result;
 }
 
 int filesize(int fd)
@@ -353,19 +360,38 @@ int open(char *file)
   char directory_str[strlen(file)+1];
   char file_name_str[strlen(file)+1];
   divide_path_str(file, directory_str, file_name_str);
+  
+  /* printf("DIR %s, size %d\n", directory_str, strlen(directory_str));
+  printf("FIL %s, size %d\n", file_name_str, strlen(file_name_str)); */
+  
   struct dir *dir = get_dir_from_path(directory_str);
   struct inode *inode = NULL;
-  if(dir == NULL) return -1;
-
+  if(dir == NULL) 
+  {
+    lock_release(&filesys_lock);
+    return -1;
+  }
   if (strlen(file_name_str) > 0) 
   {
     dir_lookup(dir, file_name_str, &inode);
     dir_close(dir);
   }
-  else 
+  else // no file name
   {
+    if(strlen(directory_str) == 0)
+    {
+      dir_close(dir);
+      lock_release(&filesys_lock);
+      return -1;
+    }
+    int fd_num = allocate_fd_id(thread_current());
+    thread_current()->fd_table[fd_num].dir = dir;
+    thread_current()->fd_table[fd_num].file = NULL;
+    thread_current()->fd_table[fd_num].in_use = true;
+    thread_current()->fd_table[fd_num].is_file = 0;
     lock_release(&filesys_lock);
-    return -1;
+    //printf("OPEN DIR %s, fd %d\n", file, fd_num);
+    return fd_num;
   }
 
   if (inode == NULL || inode_removed(inode))
@@ -382,6 +408,7 @@ int open(char *file)
     thread_current()->fd_table[fd_num].file = NULL;
     thread_current()->fd_table[fd_num].in_use = true;
     thread_current()->fd_table[fd_num].is_file = 0;
+    //printf("OPEN DIR %s, fd %d\n", file, fd_num);
   }
   else
   {
@@ -389,6 +416,7 @@ int open(char *file)
     thread_current()->fd_table[fd_num].dir = NULL;
     thread_current()->fd_table[fd_num].in_use = true;
     thread_current()->fd_table[fd_num].is_file = 1;
+    //printf("OPEN FILE %s, fd %d\n", file, fd_num);
   }
   lock_release(&filesys_lock);
   return fd_num;
@@ -398,11 +426,7 @@ int read(int fd, void* buffer, unsigned size)
 {
   ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
-  /* sema_down(&mutex);
-  reader_count++;
-  if(reader_count == 1) sema_down(&writer_sema);
-  sema_up(&mutex);
-   *///printf("read!\n");
+
   struct thread* curr = thread_current();
   int ret;
   if(fd == 1) ret = -1;
@@ -420,7 +444,11 @@ int read(int fd, void* buffer, unsigned size)
     if(!curr->fd_table[fd].in_use) ret = -1;
     else
     {
-      if(curr->fd_table[fd].is_file != 1) NOT_REACHED();
+      if(curr->fd_table[fd].is_file != 1)
+      {
+        lock_release(&filesys_lock);
+        return -1;
+      }
       if(curr->fd_table[fd].file == NULL)
       {ret = -1;}
       else
@@ -430,11 +458,6 @@ int read(int fd, void* buffer, unsigned size)
       }
     }
   }
-  
-  /* sema_down(&mutex);
-  reader_count--;
-  if(reader_count == 0) sema_up(&writer_sema);
-  sema_up(&mutex); */
 
   lock_release(&filesys_lock);
   return ret;
@@ -457,7 +480,11 @@ int write(int fd, const void* buffer, unsigned size)
     if(!curr->fd_table[fd].in_use) ret = -1;
     else
     {
-      if(curr->fd_table[fd].is_file != 1) NOT_REACHED();
+      if(curr->fd_table[fd].is_file != 1)
+      {
+        lock_release(&filesys_lock);
+        return -1;
+      }
       if(curr->fd_table[fd].file == NULL)
       {ret = -1;}
       else
@@ -638,15 +665,25 @@ void munmap(mapid_t mapping)
 
 bool readdir(int fd, char* name)
 {
+  //printf("INIT %s, fd_num %d\n", name, fd);
   ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
   if(!thread_current()->fd_table[fd].in_use) goto READDIR_ERR;
   if(thread_current()->fd_table[fd].dir == NULL) goto READDIR_ERR;
   if(thread_current()->fd_table[fd].is_file != 0) goto READDIR_ERR;
   struct dir* dir = thread_current()->fd_table[fd].dir;
+
   if(dir == NULL) goto READDIR_ERR;
-  bool result = dir_readdir(dir, name);
-  dir_close(dir);
+  
+  bool result;
+  do
+  {
+    result = dir_readdir(dir, name);
+    if(!result) break;
+    //printf("DIR! %s INODE %d\n", name, inode_get_inumber(dir_get_inode(dir)));
+  }
+  while(strcmp(name, ".") == 0 || strcmp(name, "..") == 0);
+
   lock_release(&filesys_lock);
   return result;
 

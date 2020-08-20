@@ -97,8 +97,12 @@ void remove_buffer_cache(void)
     for(; i < BUFFER_CACHE_SIZE; i++)
     {
         if(Buffer_Cache[i].valid)
+        {
             if(Buffer_Cache[i].dirty)
+            {
                 write_back(&Buffer_Cache[i]);
+            }
+        }
     }
     sema_up(&buffer_cache_writer_sema);
 }

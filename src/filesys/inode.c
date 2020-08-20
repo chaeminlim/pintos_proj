@@ -589,3 +589,8 @@ bool inode_is_dir(struct inode* inode)
 {
   return inode->data.is_dir;
 }
+
+int inode_open_count(struct inode* inode)
+{
+  return inode->open_cnt;
+}

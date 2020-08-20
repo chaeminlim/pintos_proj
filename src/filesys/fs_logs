@@ -147,7 +147,64 @@ perl -I../.. ../../tests/userprog/exec-multiple.ck tests/userprog/exec-multiple 
 pass tests/userprog/exec-multiple
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/exec-missing -a exec-missing --swap-size=4 -- -q  -f run exec-missing < /dev/null 2> tests/userprog/exec-missing.errors > tests/userprog/exec-missing.output
 perl -I../.. ../../tests/userprog/exec-missing.ck tests/userprog/exec-missing tests/userprog/exec-missing.result
-pass tests/userprog/exec-missing
+FAIL tests/userprog/exec-missing
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (exec-missing) begin
+  load: no-such-file: open failed
+  (exec-missing) exec("no-such-file"): -1
+  no-such-file: exit(-1)
+  (exec-missing) end
+  exec-missing: exit(0)
+Differences in `diff -u' format:
+  (exec-missing) begin
+  load: no-such-file: open failed
+  (exec-missing) exec("no-such-file"): -1
+- no-such-file: exit(-1)
+  (exec-missing) end
+  exec-missing: exit(0)
++ no-such-file: exit(-1)
+Acceptable output:
+  (exec-missing) begin
+  load: no-such-file: open failed
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
+Differences in `diff -u' format:
+  (exec-missing) begin
+  load: no-such-file: open failed
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
++ no-such-file: exit(-1)
+Acceptable output:
+  (exec-missing) begin
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
+Differences in `diff -u' format:
+  (exec-missing) begin
++ load: no-such-file: open failed
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
++ no-such-file: exit(-1)
+Acceptable output:
+  (exec-missing) begin
+  load: no-such-file: open failed
+  no-such-file: exit(-1)
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
+Differences in `diff -u' format:
+  (exec-missing) begin
+  load: no-such-file: open failed
+- no-such-file: exit(-1)
+  (exec-missing) exec("no-such-file"): -1
+  (exec-missing) end
+  exec-missing: exit(0)
++ no-such-file: exit(-1)
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/exec-bad-ptr -a exec-bad-ptr --swap-size=4 -- -q  -f run exec-bad-ptr < /dev/null 2> tests/userprog/exec-bad-ptr.errors > tests/userprog/exec-bad-ptr.output
 perl -I../.. ../../tests/userprog/exec-bad-ptr.ck tests/userprog/exec-bad-ptr tests/userprog/exec-bad-ptr.result
 pass tests/userprog/exec-bad-ptr
@@ -262,8 +319,7 @@ pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-open -a
 pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/dir-open.tar --swap-size=4 -- -q  run 'tar fs.tar /' < /dev/null 2> tests/filesys/extended/dir-open-persistence.errors > tests/filesys/extended/dir-open-persistence.output
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-open.ck tests/filesys/extended/dir-open tests/filesys/extended/dir-open.result
-FAIL tests/filesys/extended/dir-open
-run: write "xyzzy" (must return -1, actually 6): FAILED
+pass tests/filesys/extended/dir-open
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-over-file -a dir-over-file -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-over-file < /dev/null 2> tests/filesys/extended/dir-over-file.errors > tests/filesys/extended/dir-over-file.output
@@ -277,8 +333,7 @@ pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-rm-cwd 
 pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/dir-rm-cwd.tar --swap-size=4 -- -q  run 'tar fs.tar /' < /dev/null 2> tests/filesys/extended/dir-rm-cwd-persistence.errors > tests/filesys/extended/dir-rm-cwd-persistence.output
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-rm-cwd.ck tests/filesys/extended/dir-rm-cwd tests/filesys/extended/dir-rm-cwd.result
-FAIL tests/filesys/extended/dir-rm-cwd
-run: open "/": FAILED
+pass tests/filesys/extended/dir-rm-cwd
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-rm-parent -a dir-rm-parent -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-rm-parent < /dev/null 2> tests/filesys/extended/dir-rm-parent.errors > tests/filesys/extended/dir-rm-parent.output
@@ -299,8 +354,7 @@ pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-rm-tree
 pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/dir-rm-tree.tar --swap-size=4 -- -q  run 'tar fs.tar /' < /dev/null 2> tests/filesys/extended/dir-rm-tree-persistence.errors > tests/filesys/extended/dir-rm-tree-persistence.output
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-rm-tree.ck tests/filesys/extended/dir-rm-tree tests/filesys/extended/dir-rm-tree.result
-FAIL tests/filesys/extended/dir-rm-tree
-run: remove "/0/0/0/0": FAILED
+pass tests/filesys/extended/dir-rm-tree
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-rmdir -a dir-rmdir -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-rmdir < /dev/null 2> tests/filesys/extended/dir-rmdir.errors > tests/filesys/extended/dir-rmdir.output
@@ -322,7 +376,7 @@ pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/d
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-vine.ck tests/filesys/extended/dir-vine tests/filesys/extended/dir-vine.result
 FAIL tests/filesys/extended/dir-vine
-run: readdir "." (should fail): FAILED
+run: remove "file588": FAILED
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/grow-create -a grow-create -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run grow-create < /dev/null 2> tests/filesys/extended/grow-create.errors > tests/filesys/extended/grow-create.output
@@ -403,91 +457,220 @@ rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/syn-rw.ck tests/filesys/extended/syn-rw tests/filesys/extended/syn-rw.result
 pass tests/filesys/extended/syn-rw
 perl -I../.. ../../tests/filesys/extended/dir-empty-name-persistence.ck tests/filesys/extended/dir-empty-name-persistence tests/filesys/extended/dir-empty-name-persistence.result
+
+File tar differs from expected starting at offset 0x1603.
+Expected contents:
+0x00001600           8b ac 24 9c 00-00 00 80 7c 24 38 00 0f |   ..$.....|$8..|
+0x00001610  85 9e 00 00 00 8b 44 24-60 a8 02 74 07 83 e0 fb |......D$`..t....|
+0x00001620  89 44 24 60 c7 44 24 64-00 00 00 00 80 fa 2a 0f |.D$`.D$d......*.|
+0x00001630  84 99 00 00 00 0f be d2-8d 4a d0 b8 00 00 00 00 |.........J......|
+0x00001640  83 f9 09                                        |...             |
+Actual contents:
+0x00001600           00 00 00 00 00-00 00 00 00 00 00 00 00 |   .............|
+0x00001610  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00 |................|
+0x00001620  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00 |................|
+0x00001630  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00 |................|
+0x00001640  00 00 00                                        |...             |
 FAIL tests/filesys/extended/dir-empty-name-persistence
-Error extracting file system:
-/: open failed
+Extracted file system contents are not correct.
 perl -I../.. ../../tests/filesys/extended/dir-mk-tree-persistence.ck tests/filesys/extended/dir-mk-tree-persistence tests/filesys/extended/dir-mk-tree-persistence.result
 FAIL tests/filesys/extended/dir-mk-tree-persistence
-Error extracting file system:
-/: open failed
+Kernel panic in file system extraction run: PANIC at ../../devices/block.c:112 in check_sector(): Access past end of device hdb1 (sector=7562612, size=4096)
+Call stack: 0xc002aa86 0x65735f6b
+Translation of call stack:
+0xc002aa86: debug_panic (.../../lib/kernel/debug.c:38)
+0x65735f6b: (unknown)
 perl -I../.. ../../tests/filesys/extended/dir-mkdir-persistence.ck tests/filesys/extended/dir-mkdir-persistence tests/filesys/extended/dir-mkdir-persistence.result
 FAIL tests/filesys/extended/dir-mkdir-persistence
-Error extracting file system:
-/: open failed
+Extracted file system contents are not correct.
+a is missing from the file system.
+a/b is missing from the file system.
+
+Actual contents of file system:
+dir-mkdir: 55840-byte file
+tar: 67812-byte file
+
+Expected contents of file system:
+a: directory
+a/b: 512-byte file
+dir-mkdir: 55840-byte file
+tar: 67812-byte file
 perl -I../.. ../../tests/filesys/extended/dir-open-persistence.ck tests/filesys/extended/dir-open-persistence tests/filesys/extended/dir-open-persistence.result
 FAIL tests/filesys/extended/dir-open-persistence
-Prerequisite test tests/filesys/extended/dir-open failed.
+Extracted file system contents are not correct.
+xyzzy is missing from the file system.
+
+Actual contents of file system:
+dir-open: 55980-byte file
+tar: 67812-byte file
+
+Expected contents of file system:
+dir-open: 55980-byte file
+tar: 67812-byte file
+xyzzy: directory
 perl -I../.. ../../tests/filesys/extended/dir-over-file-persistence.ck tests/filesys/extended/dir-over-file-persistence tests/filesys/extended/dir-over-file-persistence.result
 FAIL tests/filesys/extended/dir-over-file-persistence
-Error extracting file system:
-/: open failed
+Extracted file system contents are not correct.
+abc is missing from the file system.
+
+Actual contents of file system:
+dir-over-file: 55580-byte file
+tar: 67812-byte file
+
+Expected contents of file system:
+abc: directory
+dir-over-file: 55580-byte file
+tar: 67812-byte file
 perl -I../.. ../../tests/filesys/extended/dir-rm-cwd-persistence.ck tests/filesys/extended/dir-rm-cwd-persistence tests/filesys/extended/dir-rm-cwd-persistence.result
 FAIL tests/filesys/extended/dir-rm-cwd-persistence
-Prerequisite test tests/filesys/extended/dir-rm-cwd failed.
+Kernel panic in file system extraction run: PANIC at ../../devices/block.c:112 in check_sector(): Access past end of device hdb1 (sector=65554, size=4096)
+Call stack: 0xc002aa86 0x65735f6b
+Translation of call stack:
+0xc002aa86: debug_panic (.../../lib/kernel/debug.c:38)
+0x65735f6b: (unknown)
 perl -I../.. ../../tests/filesys/extended/dir-rm-parent-persistence.ck tests/filesys/extended/dir-rm-parent-persistence tests/filesys/extended/dir-rm-parent-persistence.result
 FAIL tests/filesys/extended/dir-rm-parent-persistence
-Error extracting file system:
-/: open failed
+Extracted file system contents are not correct.
+a is missing from the file system.
+a/b is missing from the file system.
+
+Actual contents of file system:
+dir-rm-parent: 55984-byte file
+tar: 67812-byte file
+
+Expected contents of file system:
+a: directory
+a/b: directory
+dir-rm-parent: 55984-byte file
+tar: 67812-byte file
 perl -I../.. ../../tests/filesys/extended/dir-rm-root-persistence.ck tests/filesys/extended/dir-rm-root-persistence tests/filesys/extended/dir-rm-root-persistence.result
 FAIL tests/filesys/extended/dir-rm-root-persistence
-Error extracting file system:
-/: open failed
+Extracted file system contents are not correct.
+a is missing from the file system.
+
+Actual contents of file system:
+dir-rm-root: 55560-byte file
+tar: 67812-byte file
+
+Expected contents of file system:
+a: 243-byte file
+dir-rm-root: 55560-byte file
+tar: 67812-byte file
 perl -I../.. ../../tests/filesys/extended/dir-rm-tree-persistence.ck tests/filesys/extended/dir-rm-tree-persistence tests/filesys/extended/dir-rm-tree-persistence.result
 FAIL tests/filesys/extended/dir-rm-tree-persistence
-Prerequisite test tests/filesys/extended/dir-rm-tree failed.
+Kernel panic in file system extraction run: PANIC at ../../devices/block.c:112 in check_sector(): Access past end of device hdb1 (sector=65554, size=4096)
+Call stack: 0xc002aa86 0x65735f6b
+Translation of call stack:
+0xc002aa86: debug_panic (.../../lib/kernel/debug.c:38)
+0x65735f6b: (unknown)
 perl -I../.. ../../tests/filesys/extended/dir-rmdir-persistence.ck tests/filesys/extended/dir-rmdir-persistence tests/filesys/extended/dir-rmdir-persistence.result
+
+File tar differs from expected starting at offset 0x1603.
+Expected contents:
+0x00001600           8b ac 24 9c 00-00 00 80 7c 24 38 00 0f |   ..$.....|$8..|
+0x00001610  85 9e 00 00 00 8b 44 24-60 a8 02 74 07 83 e0 fb |......D$`..t....|
+0x00001620  89 44 24 60 c7 44 24 64-00 00 00 00 80 fa 2a 0f |.D$`.D$d......*.|
+0x00001630  84 99 00 00 00 0f be d2-8d 4a d0 b8 00 00 00 00 |.........J......|
+0x00001640  83 f9 09                                        |...             |
+Actual contents:
+0x00001600           00 00 00 00 00-00 00 00 00 00 00 00 00 |   .............|
+0x00001610  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00 |................|
+0x00001620  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00 |................|
+0x00001630  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00 |................|
+0x00001640  00 00 00                                        |...             |
 FAIL tests/filesys/extended/dir-rmdir-persistence
-Error extracting file system:
-/: open failed
+Extracted file system contents are not correct.
 perl -I../.. ../../tests/filesys/extended/dir-under-file-persistence.ck tests/filesys/extended/dir-under-file-persistence tests/filesys/extended/dir-under-file-persistence.result
 FAIL tests/filesys/extended/dir-under-file-persistence
-Error extracting file system:
-/: open failed
+Extracted file system contents are not correct.
+abc is missing from the file system.
+
+Actual contents of file system:
+dir-under-file: 55580-byte file
+tar: 67812-byte file
+
+Expected contents of file system:
+abc: 0-byte file
+dir-under-file: 55580-byte file
+tar: 67812-byte file
 perl -I../.. ../../tests/filesys/extended/dir-vine-persistence.ck tests/filesys/extended/dir-vine-persistence tests/filesys/extended/dir-vine-persistence.result
 FAIL tests/filesys/extended/dir-vine-persistence
 Prerequisite test tests/filesys/extended/dir-vine failed.
 perl -I../.. ../../tests/filesys/extended/grow-create-persistence.ck tests/filesys/extended/grow-create-persistence tests/filesys/extended/grow-create-persistence.result
 FAIL tests/filesys/extended/grow-create-persistence
-Error extracting file system:
-/: open failed
+Extracted file system contents are not correct.
+blargle is missing from the file system.
+
+Actual contents of file system:
+grow-create: 55604-byte file
+tar: 67812-byte file
+
+Expected contents of file system:
+blargle: 0-byte file
+grow-create: 55604-byte file
+tar: 67812-byte file
 perl -I../.. ../../tests/filesys/extended/grow-dir-lg-persistence.ck tests/filesys/extended/grow-dir-lg-persistence tests/filesys/extended/grow-dir-lg-persistence.result
 FAIL tests/filesys/extended/grow-dir-lg-persistence
-Error extracting file system:
-/: open failed
+Kernel panic in file system extraction run: PANIC at ../../devices/block.c:112 in check_sector(): Access past end of device hdb1 (sector=947730115, size=4096)
+Call stack: 0xc002aa86 0x65735f6b
+Translation of call stack:
+0xc002aa86: debug_panic (.../../lib/kernel/debug.c:38)
+0x65735f6b: (unknown)
 perl -I../.. ../../tests/filesys/extended/grow-file-size-persistence.ck tests/filesys/extended/grow-file-size-persistence tests/filesys/extended/grow-file-size-persistence.result
 FAIL tests/filesys/extended/grow-file-size-persistence
-Error extracting file system:
-/: open failed
+Kernel panic in file system extraction run: PANIC at ../../devices/block.c:112 in check_sector(): Access past end of device hdb1 (sector=1206474246, size=4096)
+Call stack: 0xc002aa86 0x65735f6b
+Translation of call stack:
+0xc002aa86: debug_panic (.../../lib/kernel/debug.c:38)
+0x65735f6b: (unknown)
 perl -I../.. ../../tests/filesys/extended/grow-root-lg-persistence.ck tests/filesys/extended/grow-root-lg-persistence tests/filesys/extended/grow-root-lg-persistence.result
 FAIL tests/filesys/extended/grow-root-lg-persistence
-Error extracting file system:
-/: open failed
+Kernel panic in file system extraction run: PANIC at ../../devices/block.c:112 in check_sector(): Access past end of device hdb1 (sector=1206474246, size=4096)
+Call stack: 0xc002aa86 0x65735f6b
+Translation of call stack:
+0xc002aa86: debug_panic (.../../lib/kernel/debug.c:38)
+0x65735f6b: (unknown)
 perl -I../.. ../../tests/filesys/extended/grow-root-sm-persistence.ck tests/filesys/extended/grow-root-sm-persistence tests/filesys/extended/grow-root-sm-persistence.result
 FAIL tests/filesys/extended/grow-root-sm-persistence
-Error extracting file system:
-/: open failed
+Kernel panic in file system extraction run: PANIC at ../../devices/block.c:112 in check_sector(): Access past end of device hdb1 (sector=1206474246, size=4096)
+Call stack: 0xc002aa86 0x65735f6b
+Translation of call stack:
+0xc002aa86: debug_panic (.../../lib/kernel/debug.c:38)
+0x65735f6b: (unknown)
 perl -I../.. ../../tests/filesys/extended/grow-seq-lg-persistence.ck tests/filesys/extended/grow-seq-lg-persistence tests/filesys/extended/grow-seq-lg-persistence.result
 FAIL tests/filesys/extended/grow-seq-lg-persistence
 Prerequisite test tests/filesys/extended/grow-seq-lg failed.
 perl -I../.. ../../tests/filesys/extended/grow-seq-sm-persistence.ck tests/filesys/extended/grow-seq-sm-persistence tests/filesys/extended/grow-seq-sm-persistence.result
 FAIL tests/filesys/extended/grow-seq-sm-persistence
-Error extracting file system:
-/: open failed
+Kernel panic in file system extraction run: PANIC at ../../devices/block.c:112 in check_sector(): Access past end of device hdb1 (sector=3863252765, size=4096)
+Call stack: 0xc002aa86 0x65735f6b
+Translation of call stack:
+0xc002aa86: debug_panic (.../../lib/kernel/debug.c:38)
+0x65735f6b: (unknown)
 perl -I../.. ../../tests/filesys/extended/grow-sparse-persistence.ck tests/filesys/extended/grow-sparse-persistence tests/filesys/extended/grow-sparse-persistence.result
 FAIL tests/filesys/extended/grow-sparse-persistence
 Prerequisite test tests/filesys/extended/grow-sparse failed.
 perl -I../.. ../../tests/filesys/extended/grow-tell-persistence.ck tests/filesys/extended/grow-tell-persistence tests/filesys/extended/grow-tell-persistence.result
 FAIL tests/filesys/extended/grow-tell-persistence
-Error extracting file system:
-/: open failed
+Kernel panic in file system extraction run: PANIC at ../../devices/block.c:112 in check_sector(): Access past end of device hdb1 (sector=1206474246, size=4096)
+Call stack: 0xc002aa86 0x65735f6b
+Translation of call stack:
+0xc002aa86: debug_panic (.../../lib/kernel/debug.c:38)
+0x65735f6b: (unknown)
 perl -I../.. ../../tests/filesys/extended/grow-two-files-persistence.ck tests/filesys/extended/grow-two-files-persistence tests/filesys/extended/grow-two-files-persistence.result
 FAIL tests/filesys/extended/grow-two-files-persistence
-Error extracting file system:
-/: open failed
+Kernel panic in file system extraction run: PANIC at ../../devices/block.c:112 in check_sector(): Access past end of device hdb1 (sector=1954047348, size=4096)
+Call stack: 0xc002aa86 0x65735f6b
+Translation of call stack:
+0xc002aa86: debug_panic (.../../lib/kernel/debug.c:38)
+0x65735f6b: (unknown)
 perl -I../.. ../../tests/filesys/extended/syn-rw-persistence.ck tests/filesys/extended/syn-rw-persistence tests/filesys/extended/syn-rw-persistence.result
 FAIL tests/filesys/extended/syn-rw-persistence
-Error extracting file system:
-/: open failed
+Kernel panic in file system extraction run: PANIC at ../../devices/block.c:112 in check_sector(): Access past end of device hdb1 (sector=2298478593, size=4096)
+Call stack: 0xc002aa86 0x65735f6b
+Translation of call stack:
+0xc002aa86: debug_panic (.../../lib/kernel/debug.c:38)
+0x65735f6b: (unknown)
 pass tests/userprog/args-none
 pass tests/userprog/args-single
 pass tests/userprog/args-multiple
@@ -537,7 +720,7 @@ pass tests/userprog/exec-bound
 pass tests/userprog/exec-bound-2
 pass tests/userprog/exec-bound-3
 pass tests/userprog/exec-multiple
-pass tests/userprog/exec-missing
+FAIL tests/userprog/exec-missing
 pass tests/userprog/exec-bad-ptr
 pass tests/userprog/wait-simple
 pass tests/userprog/wait-twice
@@ -570,12 +753,12 @@ pass tests/filesys/base/syn-write
 pass tests/filesys/extended/dir-empty-name
 pass tests/filesys/extended/dir-mk-tree
 pass tests/filesys/extended/dir-mkdir
-FAIL tests/filesys/extended/dir-open
+pass tests/filesys/extended/dir-open
 pass tests/filesys/extended/dir-over-file
-FAIL tests/filesys/extended/dir-rm-cwd
+pass tests/filesys/extended/dir-rm-cwd
 pass tests/filesys/extended/dir-rm-parent
 pass tests/filesys/extended/dir-rm-root
-FAIL tests/filesys/extended/dir-rm-tree
+pass tests/filesys/extended/dir-rm-tree
 pass tests/filesys/extended/dir-rmdir
 pass tests/filesys/extended/dir-under-file
 FAIL tests/filesys/extended/dir-vine
@@ -613,5 +796,5 @@ FAIL tests/filesys/extended/grow-sparse-persistence
 FAIL tests/filesys/extended/grow-tell-persistence
 FAIL tests/filesys/extended/grow-two-files-persistence
 FAIL tests/filesys/extended/syn-rw-persistence
-29 of 125 tests failed.
+27 of 125 tests failed.
 ../../tests/Make.tests:26: recipe for target 'check' failed

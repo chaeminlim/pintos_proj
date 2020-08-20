@@ -6,6 +6,8 @@
 #include "filesys/inode.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
+
+bool dir_is_empty (const struct dir *dir);
 /* A directory. */
 struct dir 
   {
@@ -130,6 +132,7 @@ lookup (const struct dir *dir, const char *name,
     {
       break;
     }
+    //printf("name %s ename %s, e.in_use %d\n", name, e.name, e.in_use);
     if (e.in_use && !strcmp (name, e.name)) 
     {
       if (ep != NULL)
@@ -138,7 +141,7 @@ lookup (const struct dir *dir, const char *name,
         *ofsp = ofs;
       return true;
     }
-  } 
+  }
   return false;
 }
 
@@ -257,6 +260,14 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
+   /* Prevent removing non-empty directory. */
+  if (inode_is_dir(inode)) 
+  {
+    struct dir *target = dir_open(inode);
+    bool is_empty = dir_is_empty(target);
+    dir_close(target);
+    if (!is_empty) goto done;
+  }
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
@@ -305,7 +316,7 @@ void divide_path_str(const char* name, char* directory, char* file_name)
     file_name[0] = '\0'; 
     return; 
   }
-  if(name[length-1] == '/')
+  if(name[length-1] == '/') // 슬래쉬로 끝날 때
   {
     memcpy(directory, name, length + 1);
     file_name[0] = '\0';
@@ -331,8 +342,8 @@ void divide_path_str(const char* name, char* directory, char* file_name)
     }
     else
     {
-      memcpy(directory, name, moving_idx);
-      directory[moving_idx] = '\0';
+      memcpy(directory, name, moving_idx + 1);
+      directory[moving_idx + 1] = '\0';
       memcpy(file_name, name + moving_idx + 1, length - moving_idx);
       file_name[length - moving_idx - 1] = '\0';
     }
@@ -402,5 +413,17 @@ struct dir* get_dir_from_path(const char* directory)
   }
 
   return current; 
+}
+
+bool dir_is_empty (const struct dir *dir)
+{
+  struct dir_entry e;
+  off_t ofs = sizeof(e) * 2;
+  for (; inode_read_at(dir->inode, &e, sizeof e, ofs) == sizeof e; ofs += sizeof e)
+  {
+    if (e.in_use)
+      return false;
+  }
+  return true;
 }
 
