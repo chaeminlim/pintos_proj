@@ -199,24 +199,27 @@ thread_create (const char *name, int priority,
   t->parent = curr;
   list_push_back(&curr->child_list, &t->child_list_elem);
   
-   
-  #ifdef USERPROG
   
-  //t->fd_table = palloc_get_page (PAL_ZERO);
-  t->fd_table = malloc ( sizeof(struct file*)*128);
+  t->fd_table = malloc ( sizeof(struct FD) * 128);
   
   if (t->fd_table == NULL)
   {
-    palloc_free_page (t);
+    free(t);
     return TID_ERROR;
-  } 
+  }
   int i = 0;
-  for(; i < 128; i++) t->fd_table[i] = NULL;
+  for(; i < 128; i++)
+  {
+    t->fd_table[i].file = NULL;
+    t->fd_table[i].dir = NULL;
+    t->fd_table[i].in_use = false;
+    t->fd_table[i].is_file = 2;
+  } 
 
   t->mm_struct = malloc(sizeof(struct mm_struct));
   list_init(&t->mm_struct->mmap_list);
   t->mm_struct->next_mapid = 0;
-  #endif
+
   
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
@@ -772,18 +775,20 @@ struct thread* get_child_thread(tid_t tid)
   return NULL;
 }
 
-#ifdef USERPROG
 
 int allocate_fd_id(struct thread* t)
 {
   int i = 3;
   for(; i < 128; i++)
   {
-    if(t->fd_table[i] == NULL) return i;
+    if(t->fd_table[i].in_use == false)
+    {
+      t->fd_table[i].in_use = true;
+      return i;
+    }
   }
   return -1;
 }
-#endif
 
 static void
 update_next_tick_to_awake (int64_t tick)

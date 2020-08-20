@@ -294,22 +294,28 @@ bool remove(const char* file)
 int filesize(int fd)
 {
   struct thread* t = thread_current();
-  if(t->fd_table[fd] == NULL) return -1;
-  else return file_length(t->fd_table[fd]);
+  if(!t->fd_table[fd].in_use) return -1;
+  if(t->fd_table[fd].is_file != 1) return -1;
+  if(t->fd_table[fd].file == NULL) return -1;
+  else return file_length(t->fd_table[fd].file);
 }
 
 void seek(int fd, unsigned position)
 {
   struct thread* t = thread_current();
-  if(t->fd_table[fd] == NULL) return;
-  else file_seek(t->fd_table[fd], position);
+  if(!t->fd_table[fd].in_use) return;
+  if(t->fd_table[fd].is_file != 1) return;
+  if(t->fd_table[fd].file == NULL) return;
+  else file_seek(t->fd_table[fd].file, position);
 }
 
 unsigned tell(int fd)
 {
   struct thread* t = thread_current();
-  if(t->fd_table[fd] == NULL) return -1;
-  else return file_tell(t->fd_table[fd]);
+  if(!t->fd_table[fd].in_use) return -1;
+  if(t->fd_table[fd].is_file != 1) return -1;
+  if(t->fd_table[fd].file == NULL) return -1;
+  else return file_tell(t->fd_table[fd].file);
 }
 
 
@@ -318,40 +324,80 @@ void close(int fd)
   ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
   struct thread* t = thread_current();
-  if(t->fd_table[fd] == NULL) {lock_release(&filesys_lock);return;}
-  file_close(t->fd_table[fd]);
-  t->fd_table[fd] = NULL;
+  if(!t->fd_table[fd].in_use) goto CLOSE_ERR;
+  if(t->fd_table[fd].is_file == 2) goto CLOSE_ERR;
+  if(t->fd_table[fd].is_file == 1)
+  {
+    if(t->fd_table[fd].file == NULL) PANIC("NULL ERROR");
+    file_close(t->fd_table[fd].file);
+    t->fd_table[fd].in_use = false;
+    t->fd_table[fd].is_file = 2;
+    t->fd_table[fd].file = NULL;
+  }
+  else if(t->fd_table[fd].is_file == 0)
+  {
+    if(t->fd_table[fd].dir == NULL) PANIC("NULL ERROR");
+    dir_close(t->fd_table[fd].dir);
+    t->fd_table[fd].in_use = false;
+    t->fd_table[fd].is_file = 2;
+    t->fd_table[fd].dir = NULL;
+  }
+
+CLOSE_ERR:
   lock_release(&filesys_lock);
 }
 // finished
 int open(char *file)
 {
-  struct file* opened_file = NULL;
-  int fd_num;
-  ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
-  opened_file = filesys_open(file);
-  
-  if(opened_file == NULL)
+  char directory_str[strlen(file)+1];
+  char file_name_str[strlen(file)+1];
+  divide_path_str(file, directory_str, file_name_str);
+  struct dir *dir = get_dir_from_path(directory_str);
+  struct inode *inode = NULL;
+  if(dir == NULL) return -1;
+
+  if (strlen(file_name_str) > 0) 
+  {
+    dir_lookup(dir, file_name_str, &inode);
+    dir_close(dir);
+  }
+  else 
   {
     lock_release(&filesys_lock);
     return -1;
   }
+
+  if (inode == NULL || inode_removed(inode))
+  {
+    lock_release(&filesys_lock);
+    return -1; 
+  }
+
+  int fd_num = allocate_fd_id(thread_current());
+
+  if(inode_is_dir(inode))
+  {
+    thread_current()->fd_table[fd_num].dir = dir_open(inode);
+    thread_current()->fd_table[fd_num].file = NULL;
+    thread_current()->fd_table[fd_num].in_use = true;
+    thread_current()->fd_table[fd_num].is_file = 0;
+  }
   else
   {
-    fd_num = allocate_fd_id(thread_current());
-    if(fd_num == -1) {lock_release(&filesys_lock); return -1;}
-    thread_current()->fd_table[fd_num] = opened_file;
-    lock_release(&filesys_lock);
-    return fd_num;
+    thread_current()->fd_table[fd_num].file = file_open(inode);
+    thread_current()->fd_table[fd_num].dir = NULL;
+    thread_current()->fd_table[fd_num].in_use = true;
+    thread_current()->fd_table[fd_num].is_file = 1;
   }
+  lock_release(&filesys_lock);
+  return fd_num;
 }
 
 int read(int fd, void* buffer, unsigned size)
 {
   ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
-  
   /* sema_down(&mutex);
   reader_count++;
   if(reader_count == 1) sema_down(&writer_sema);
@@ -371,12 +417,17 @@ int read(int fd, void* buffer, unsigned size)
   }
   else
   {
-    if(curr->fd_table[fd] == NULL) ret = -1;
+    if(!curr->fd_table[fd].in_use) ret = -1;
     else
     {
-      int rett = file_read(curr->fd_table[fd], buffer, size);
-      ret = rett;
-      
+      if(curr->fd_table[fd].is_file != 1) NOT_REACHED();
+      if(curr->fd_table[fd].file == NULL)
+      {ret = -1;}
+      else
+      {
+        int rett = file_read(curr->fd_table[fd].file, buffer, size);
+        ret = rett;
+      }
     }
   }
   
@@ -391,14 +442,10 @@ int read(int fd, void* buffer, unsigned size)
 
 int write(int fd, const void* buffer, unsigned size)
 {
-  
-  //printf("try lock acquire ! %d\n", curr->tid);
-  //sema_down(&writer_sema);
   ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
   struct thread* curr = thread_current();
   int ret;
-  //printf("lock acquire ! %d\n", curr->tid);
   if(fd == 0) ret = -1;
   else if(fd == 1)
   {
@@ -407,15 +454,19 @@ int write(int fd, const void* buffer, unsigned size)
   }
   else
   {
-    if(curr->fd_table[fd] == NULL) ret = -1;
+    if(!curr->fd_table[fd].in_use) ret = -1;
     else
     {
-      ret = file_write(curr->fd_table[fd], buffer, size);
+      if(curr->fd_table[fd].is_file != 1) NOT_REACHED();
+      if(curr->fd_table[fd].file == NULL)
+      {ret = -1;}
+      else
+      {
+        ret = file_write(curr->fd_table[fd].file, buffer, size);
+      }
     }
   }
   lock_release(&filesys_lock);
-  //sema_up(&writer_sema);
-  
   return ret;
 }
 
@@ -518,7 +569,10 @@ mapid_t mmap(int fd, void *addr)
   if (is_user_vaddr (addr) == false) return -1;
   // lock
   struct thread* curr = thread_current();
-  struct file* target_file = curr->fd_table[fd];
+  if(!curr->fd_table[fd].in_use) return -1;
+  if(curr->fd_table[fd].file == NULL) return -1;
+  if(curr->fd_table[fd].is_file != 1) return -1;
+  struct file* target_file = curr->fd_table[fd].file;
   if(target_file == NULL) {   return -1; }
   struct file* file_reopened = file_reopen(target_file);
   if(file_reopened == NULL) {  return -1; }
@@ -586,18 +640,16 @@ bool readdir(int fd, char* name)
 {
   ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
-  struct file* file = thread_current()->fd_table[fd];
-  if(file == NULL) goto READDIR_ERR;
-  struct inode* inode = file_get_inode(file);
-  if(inode == NULL) goto READDIR_ERR;
-  bool result = inode_is_dir(inode);
-  if(!result) goto READDIR_ERR;
-  struct dir* dir = dir_open(inode);
+  if(!thread_current()->fd_table[fd].in_use) goto READDIR_ERR;
+  if(thread_current()->fd_table[fd].dir == NULL) goto READDIR_ERR;
+  if(thread_current()->fd_table[fd].is_file != 0) goto READDIR_ERR;
+  struct dir* dir = thread_current()->fd_table[fd].dir;
   if(dir == NULL) goto READDIR_ERR;
-  result = dir_readdir(dir, name);
+  bool result = dir_readdir(dir, name);
   dir_close(dir);
   lock_release(&filesys_lock);
   return result;
+
 READDIR_ERR:
   lock_release(&filesys_lock);
   return false;
@@ -631,8 +683,11 @@ bool isdir(int fd)
 {
   ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
-  struct file* file = thread_current()->fd_table[fd];
-  bool result =  inode_is_dir(file_get_inode(file)); 
+  bool result;
+  if(!thread_current()->fd_table[fd].in_use) result = false;
+  if(thread_current()->fd_table[fd].dir == NULL) result = false;
+  if(thread_current()->fd_table[fd].is_file == 0) result = true;
+  else result = false;
   lock_release(&filesys_lock);
   return result;
 }
@@ -641,7 +696,23 @@ int inumber(int fd)
 {
   ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire (&filesys_lock);
-  int result = inode_get_inumber(file_get_inode(thread_current()->fd_table[fd]));
+  int result;
+  if(!thread_current()->fd_table[fd].in_use) result = -1;
+  if(thread_current()->fd_table[fd].is_file == 0)
+  {
+    if(thread_current()->fd_table[fd].dir == NULL) PANIC("NULL");
+    result = inode_get_inumber(dir_get_inode(thread_current()->fd_table[fd].dir));
+  }
+  else if(thread_current()->fd_table[fd].is_file == 1)
+  {
+    if(thread_current()->fd_table[fd].file == NULL) PANIC("NULL");
+    result = inode_get_inumber(file_get_inode(thread_current()->fd_table[fd].file));
+  }
+  else
+  {
+    PANIC("NOT INIT");
+  }
+  
   lock_release(&filesys_lock);
   return result;
 }

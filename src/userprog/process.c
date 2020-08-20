@@ -152,9 +152,20 @@ process_exit (void)
   int i = 3;
   for(; i < 128; i++)
   {
-    if(cur->fd_table[i] != NULL)
+    if(cur->fd_table[i].in_use)
     {
-      file_close(cur->fd_table[i]);
+      if(cur->fd_table[i].is_file == 1)
+      {
+        if(cur->fd_table[i].file == NULL) PANIC("ERR");
+        file_close(cur->fd_table[i].file);
+      } 
+      else if(cur->fd_table[i].is_file == 0)
+      {
+        if(cur->fd_table[i].dir == NULL) PANIC("ERR");
+        dir_close(cur->fd_table[i].dir);
+      }  
+      else
+        PANIC("ERR");
     }
   }
   
@@ -326,7 +337,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
   /* Open executable file. */
-  file = filesys_open (t->name);
+  file = filesys_open(t->name);
   
   if (file == NULL) 
   {

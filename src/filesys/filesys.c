@@ -92,7 +92,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
    otherwise.
    Fails if no file named NAME exists,
    or if an internal memory allocation fails. */
-struct file *
+struct file*
 filesys_open (const char *name)
 {
   char directory_str[strlen(name)+1];
@@ -117,6 +117,11 @@ filesys_open (const char *name)
   {
     return NULL; 
   }
+
+  if(inode_is_dir(inode))
+  {
+    return NULL;
+  }
   return file_open (inode);
 }
 
@@ -130,6 +135,8 @@ filesys_remove (const char *name)
   char directory_str[strlen(name)+1];
   char file_name_str[strlen(name)+1];
   divide_path_str(name, directory_str, file_name_str);
+  if(strcmp(file_name_str, "..") == 0 || strcmp(file_name_str, ".") == 0) return false;
+
   struct dir *dir = get_dir_from_path(directory_str);
   bool success = dir != NULL && dir_remove (dir, name);
   dir_close (dir); 
