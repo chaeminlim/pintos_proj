@@ -57,7 +57,7 @@ process_execute (const char *file_name)
 
   if (tid == TID_ERROR)
   {
-    palloc_free_page (fn_copy);
+    free(fn_copy);
   }
   return tid; 
 }
@@ -323,6 +323,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   }
   process_activate (); 
 
+  ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
   /* Open executable file. */
   file = filesys_open (t->name);

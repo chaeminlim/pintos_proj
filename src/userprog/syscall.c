@@ -6,6 +6,8 @@
 #include "userprog/process.h"
 #include "devices/shutdown.h"
 #include "filesys/filesys.h"
+#include "filesys/directory.h"
+#include "filesys/inode.h"
 #include "filesys/file.h"
 #include "threads/vaddr.h"
 #include "threads/palloc.h"
@@ -201,12 +203,20 @@ syscall_handler (struct intr_frame *f)
     //#ifdef FILESYS
     case SYS_CHDIR:
     {
-      PANIC("NOT ALLOWED SYSCALL NUMBER %d", syscall_number);
+      is_safe_addr(f->esp + 4);
+      void* str = (char*)*((int*)f->esp + 1);
+      is_string_safe(str);
+      f->eax = chdir(str);
+      unpin_page_string(str);
       break;
     }
     case SYS_MKDIR:
     {
-      PANIC("NOT ALLOWED SYSCALL NUMBER %d", syscall_number);
+      is_safe_addr(f->esp + 4);
+      void* str = (char*)*((int*)f->esp + 1);
+      is_string_safe(str);
+      f->eax = mkdir(str);
+      unpin_page_string(str);
       break;
     }
     case SYS_READDIR:
@@ -221,12 +231,16 @@ syscall_handler (struct intr_frame *f)
     }
     case SYS_ISDIR:
     {
-      PANIC("NOT ALLOWED SYSCALL NUMBER %d", syscall_number);
+      is_safe_addr(f->esp + 4);
+      int fd = *(int*)(f->esp+4);
+      f->eax = isdir(fd);
       break;
     }
     case SYS_INUMBER:
     {
-      PANIC("NOT ALLOWED SYSCALL NUMBER %d", syscall_number);
+      is_safe_addr(f->esp + 4);
+      int fd = *(int*)(f->esp+4);
+      f->eax = inumber(fd);
       break;
     }
     //#endif
@@ -301,6 +315,7 @@ unsigned tell(int fd)
 
 void close(int fd)
 {
+  ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
   struct thread* t = thread_current();
   if(t->fd_table[fd] == NULL) {lock_release(&filesys_lock);return;}
@@ -313,7 +328,7 @@ int open(char *file)
 {
   struct file* opened_file = NULL;
   int fd_num;
-
+  ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
   opened_file = filesys_open(file);
   
@@ -334,6 +349,7 @@ int open(char *file)
 
 int read(int fd, void* buffer, unsigned size)
 {
+  ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
   
   /* sema_down(&mutex);
@@ -378,6 +394,7 @@ int write(int fd, const void* buffer, unsigned size)
   
   //printf("try lock acquire ! %d\n", curr->tid);
   //sema_down(&writer_sema);
+  ASSERT(!lock_held_by_current_thread(&filesys_lock));
   lock_acquire(&filesys_lock);
   struct thread* curr = thread_current();
   int ret;
@@ -567,25 +584,64 @@ void munmap(mapid_t mapping)
 
 bool readdir(int fd, char* name)
 {
+  ASSERT(!lock_held_by_current_thread(&filesys_lock));
+  lock_acquire(&filesys_lock);
+  struct file* file = thread_current()->fd_table[fd];
+  if(file == NULL) goto READDIR_ERR;
+  struct inode* inode = file_get_inode(file);
+  if(inode == NULL) goto READDIR_ERR;
+  bool result = inode_is_dir(inode);
+  if(!result) goto READDIR_ERR;
+  struct dir* dir = dir_open(inode);
+  if(dir == NULL) goto READDIR_ERR;
+  result = dir_readdir(dir, name);
+  dir_close(dir);
+  lock_release(&filesys_lock);
+  return result;
+READDIR_ERR:
+  lock_release(&filesys_lock);
   return false;
 }
 
 bool mkdir(const char* dir)
 {
-  return false;
+  ASSERT(!lock_held_by_current_thread(&filesys_lock));
+  lock_acquire(&filesys_lock);
+  bool result = filesys_create(dir, 2, true);
+  lock_release(&filesys_lock);
+  return result;
 }
 
 bool chdir(const char* dir)
 {
-  return false;
+  ASSERT(!lock_held_by_current_thread(&filesys_lock));
+  lock_acquire(&filesys_lock);
+  struct dir* dirr = get_dir_from_path(dir);
+  dir_close(thread_current()->current_dir);
+  thread_current()->current_dir =  dirr;
+  lock_release(&filesys_lock);
+  if(dirr == NULL)
+  {
+    return false;
+  }
+  return true;
 }
 
 bool isdir(int fd)
 {
-  return false;
+  ASSERT(!lock_held_by_current_thread(&filesys_lock));
+  lock_acquire(&filesys_lock);
+  struct file* file = thread_current()->fd_table[fd];
+  bool result =  inode_is_dir(file_get_inode(file)); 
+  lock_release(&filesys_lock);
+  return result;
 }
 
 int inumber(int fd)
 {
-  return -1;
+  ASSERT(!lock_held_by_current_thread(&filesys_lock));
+  lock_acquire (&filesys_lock);
+  int result = inode_get_inumber(file_get_inode(thread_current()->fd_table[fd]));
+  lock_release(&filesys_lock);
+  return result;
 }

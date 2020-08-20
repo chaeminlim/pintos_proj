@@ -5,6 +5,16 @@
         "hash_map": "c",
         "hash_set": "c",
         "initializer_list": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "array": "c",
+        "*.tcc": "c",
+        "string": "c",
+        "vector": "c",
+        "istream": "c",
+        "limits": "c",
+        "ostream": "c",
+        "ratio": "c",
+        "sstream": "c",
+        "streambuf": "c"
     }
 }

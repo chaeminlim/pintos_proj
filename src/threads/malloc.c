@@ -119,6 +119,7 @@ malloc (size_t size)
       return a + 1;
     }
 
+  ASSERT(!lock_held_by_current_thread(&d->lock));
   lock_acquire (&d->lock);
 
   /* If the free list is empty, create a new arena. */

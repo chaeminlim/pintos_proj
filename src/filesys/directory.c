@@ -33,9 +33,21 @@ dir_create (block_sector_t sector, size_t entry_cnt)
   if(dir == NULL) NOT_REACHED();
   struct dir_entry entry;
   entry.inode_sector = sector;
+  entry.in_use = true;
+  memcpy(entry.name, ".", 2);
   if(inode_write_at(dir->inode, &entry, sizeof(struct dir_entry), 0) != sizeof(struct dir_entry))
   {
     status = false;
+  }
+  if(sector == ROOT_DIR_SECTOR)
+  {
+    entry.inode_sector = sector;
+    entry.in_use = true;
+    memcpy(entry.name, "..", 3);
+    if(inode_write_at(dir->inode, &entry, sizeof(struct dir_entry), sizeof(struct dir_entry)) != sizeof(struct dir_entry))
+    {
+      status = false;
+    } 
   }
   dir_close(dir);
   return status; 
@@ -111,16 +123,22 @@ lookup (const struct dir *dir, const char *name,
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-       ofs += sizeof e) 
+  for (ofs = 0; ; ofs += sizeof e)
+  {
+    off_t i = inode_read_at(dir->inode, &e, sizeof e, ofs);
+    if(i != sizeof e)
+    {
+      break;
+    }
     if (e.in_use && !strcmp (name, e.name)) 
-      {
-        if (ep != NULL)
-          *ep = e;
-        if (ofsp != NULL)
-          *ofsp = ofs;
-        return true;
-      }
+    {
+      if (ep != NULL)
+        *ep = e;
+      if (ofsp != NULL)
+        *ofsp = ofs;
+      return true;
+    }
+  } 
   return false;
 }
 
@@ -136,21 +154,14 @@ dir_lookup (const struct dir *dir, const char *name, struct inode **inode)
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  if(strcmp(name, ".") == 0)
+  if (lookup (dir, name, &e, NULL))
   {
-    *inode = inode_reopen(dir->inode);
-    if(inode == NULL) NOT_REACHED();
-  }
-  else if(strcmp(name, "..") == 0)
-  {
-    inode_read_at(dir->inode, &e, sizeof(e), 0);
-    *inode = inode_open(e.inode_sector);
-    if(inode == NULL) NOT_REACHED();
-  }
-  else if (lookup (dir, name, &e, NULL))
     *inode = inode_open (e.inode_sector);
+  }
   else
+  {
     *inode = NULL;
+  }
 
   return *inode != NULL;
 }
@@ -180,17 +191,20 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector, bool is
     goto done;
 
   // 자식을 만들 떄, 부모로서 설정해준다.
-  if(is_dir)
+  if(inode_sector != ROOT_DIR_SECTOR)
   {
-    struct dir* child_dir = dir_open(inode_open(inode_sector));
-    if(child_dir == NULL) NOT_REACHED();
-    e.inode_sector = inode_get_inumber(dir_get_inode(dir));
-    if(inode_write_at(child_dir->inode, &e, sizeof(e), 0) != sizeof(e))
-      NOT_REACHED();
-    dir_close(dir);
+    if(is_dir)
+    {
+      struct dir* child_dir = dir_open(inode_open(inode_sector));
+      if(child_dir == NULL) NOT_REACHED();
+      e.inode_sector = inode_get_inumber(dir_get_inode(dir));
+      e.in_use = true;
+      strlcpy(e.name, "..", 3);
+      if(inode_write_at(child_dir->inode, &e, sizeof(e), sizeof(e)) != sizeof(e))
+        NOT_REACHED();
+      
+    }
   }
-
-
   /* Set OFS to offset of free slot.
      If there are no free slots, then it will be set to the
      current end-of-file.
@@ -198,17 +212,24 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector, bool is
      inode_read_at() will only return a short read at end of file.
      Otherwise, we'd need to verify that we didn't get a short
      read due to something intermittent such as low memory. */
+  
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-       ofs += sizeof e) 
+       ofs += sizeof e)
+  {
+   
     if (!e.in_use)
       break;
+  }
+    
 
   /* Write slot. */
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);
   e.inode_sector = inode_sector;
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-
+/* 
+  if(is_dir)
+    PANIC("DDDDDDDDDDDD success %d name %s is_dir %d", success, name, is_dir); */
  done:
   return success;
 }
@@ -273,36 +294,48 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 
 void divide_path_str(const char* name, char* directory, char* file_name)
 {
+  // 슬래쉬로 끝난다면 // 전부다 디렉토리
+  // 슬래시로 끝나지 않는다면 디렉토리 또는 파일
+  // 슬래시로 시작한다면 절대경로
   int length = strlen(name);
-  if(length <= 0)
+  if(length < 0) NOT_REACHED();
+  if(length == 0)
   {
     directory[0] = '\0';
     file_name[0] = '\0'; 
     return; 
   }
-  bool end_with_slash = (name[length-1] == '/');
-  int back_start_index = end_with_slash ? length : length - 1;
-  bool flag = false;
-  for(; back_start_index >= 0; back_start_index--)
+  if(name[length-1] == '/')
   {
-    if(name[back_start_index] == '/')
+    memcpy(directory, name, length + 1);
+    file_name[0] = '\0';
+    return;
+  }
+  else // 슬래시로 끝나지 않을 떄
+  {
+    int moving_idx = length - 1;
+    int flag = false;
+    for(;moving_idx >= 0; moving_idx--)
     {
-      flag = true;
-      break;
+      if(name[moving_idx] == '/')
+      {
+        flag = true;
+        break;
+      }
     }
-  }
-  if(flag)
-  {
-    memcpy(directory, name, back_start_index + 1);
-    directory[back_start_index + 1] = '\0';
-    memcpy(file_name, name + (back_start_index + 1), length - back_start_index - 1);
-    file_name[length - back_start_index] = '\0';  
-  }
-  else // just name
-  {
-    directory[0] = '\0';
-    memcpy(file_name, name, length);
-    file_name[length + 1] = '\0';
+    if(!flag) // cannot find slash
+    {
+      directory[0] = '\0';
+      memcpy(file_name, name, length + 1);
+      return;
+    }
+    else
+    {
+      memcpy(directory, name, moving_idx);
+      directory[moving_idx] = '\0';
+      memcpy(file_name, name + moving_idx + 1, length - moving_idx);
+      file_name[length - moving_idx - 1] = '\0';
+    }
   }
 }
 
@@ -321,8 +354,6 @@ struct dir* get_dir_from_path(const char* directory)
       current = dir_reopen(thread_current()->current_dir);
     return current;
   }
-  
-  
   
   strlcpy(temp_dir, directory, length + 1);
   bool is_absolute = (directory[0] == '/');
@@ -365,5 +396,11 @@ struct dir* get_dir_from_path(const char* directory)
     dir_close(current);
     return NULL;
   }
+  if(inode_get_inumber(dir_get_inode(current)) < 1)
+  {
+    NOT_REACHED();
+  }
+
   return current; 
 }
+

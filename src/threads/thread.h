@@ -123,10 +123,11 @@ struct thread
     struct semaphore sema_exit;
     struct semaphore sema_load;
     struct dir* current_dir;
+    struct file** fd_table;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    struct file** fd_table;
+    
     struct file* executing_file;
 #endif
 

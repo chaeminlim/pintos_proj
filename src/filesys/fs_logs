@@ -1,3 +1,5 @@
+cd build && make check
+make[1]: Entering directory '/workspace/pintos_v/pintos/src/filesys/build'
 pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/args-none -a args-none --swap-size=4 -- -q  -f run args-none < /dev/null 2> tests/userprog/args-none.errors > tests/userprog/args-none.output
 perl -I../.. ../../tests/userprog/args-none.ck tests/userprog/args-none tests/userprog/args-none.result
 pass tests/userprog/args-none
@@ -241,36 +243,21 @@ pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-empty-n
 pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/dir-empty-name.tar --swap-size=4 -- -q  run 'tar fs.tar /' < /dev/null 2> tests/filesys/extended/dir-empty-name-persistence.errors > tests/filesys/extended/dir-empty-name-persistence.output
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-empty-name.ck tests/filesys/extended/dir-empty-name tests/filesys/extended/dir-empty-name.result
-FAIL tests/filesys/extended/dir-empty-name
-Kernel panic in run: PANIC at ../../userprog/syscall.c:197 in syscall_handler(): NOT ALLOWED SYSCALL NUMBER 16
-Call stack: 0xc002a9a6 0x5f6c6c61d
-Translation of call stack:
-0xc002a9a6: debug_panic (.../../lib/kernel/debug.c:38)
-0x5f6c6c61d: (unknown)
+pass tests/filesys/extended/dir-empty-name
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-mk-tree -a dir-mk-tree -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-mk-tree < /dev/null 2> tests/filesys/extended/dir-mk-tree.errors > tests/filesys/extended/dir-mk-tree.output
 pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/dir-mk-tree.tar --swap-size=4 -- -q  run 'tar fs.tar /' < /dev/null 2> tests/filesys/extended/dir-mk-tree-persistence.errors > tests/filesys/extended/dir-mk-tree-persistence.output
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-mk-tree.ck tests/filesys/extended/dir-mk-tree tests/filesys/extended/dir-mk-tree.result
-FAIL tests/filesys/extended/dir-mk-tree
-Kernel panic in run: PANIC at ../../userprog/syscall.c:197 in syscall_handler(): NOT ALLOWED SYSCALL NUMBER 16
-Call stack: 0xc002a9a6 0x5f6c6c61d
-Translation of call stack:
-0xc002a9a6: debug_panic (.../../lib/kernel/debug.c:38)
-0x5f6c6c61d: (unknown)
+pass tests/filesys/extended/dir-mk-tree
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-mkdir -a dir-mkdir -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-mkdir < /dev/null 2> tests/filesys/extended/dir-mkdir.errors > tests/filesys/extended/dir-mkdir.output
 pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/dir-mkdir.tar --swap-size=4 -- -q  run 'tar fs.tar /' < /dev/null 2> tests/filesys/extended/dir-mkdir-persistence.errors > tests/filesys/extended/dir-mkdir-persistence.output
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-mkdir.ck tests/filesys/extended/dir-mkdir tests/filesys/extended/dir-mkdir.result
-FAIL tests/filesys/extended/dir-mkdir
-Kernel panic in run: PANIC at ../../userprog/syscall.c:197 in syscall_handler(): NOT ALLOWED SYSCALL NUMBER 16
-Call stack: 0xc002a9a6 0x5f6c6c61d
-Translation of call stack:
-0xc002a9a6: debug_panic (.../../lib/kernel/debug.c:38)
-0x5f6c6c61d: (unknown)
+pass tests/filesys/extended/dir-mkdir
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-open -a dir-open -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-open < /dev/null 2> tests/filesys/extended/dir-open.errors > tests/filesys/extended/dir-open.output
@@ -278,23 +265,14 @@ pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/d
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-open.ck tests/filesys/extended/dir-open tests/filesys/extended/dir-open.result
 FAIL tests/filesys/extended/dir-open
-Kernel panic in run: PANIC at ../../userprog/syscall.c:197 in syscall_handler(): NOT ALLOWED SYSCALL NUMBER 16
-Call stack: 0xc002a9a6 0x5f6c6c61d
-Translation of call stack:
-0xc002a9a6: debug_panic (.../../lib/kernel/debug.c:38)
-0x5f6c6c61d: (unknown)
+run: write "xyzzy" (must return -1, actually 6): FAILED
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-over-file -a dir-over-file -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-over-file < /dev/null 2> tests/filesys/extended/dir-over-file.errors > tests/filesys/extended/dir-over-file.output
 pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/dir-over-file.tar --swap-size=4 -- -q  run 'tar fs.tar /' < /dev/null 2> tests/filesys/extended/dir-over-file-persistence.errors > tests/filesys/extended/dir-over-file-persistence.output
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-over-file.ck tests/filesys/extended/dir-over-file tests/filesys/extended/dir-over-file.result
-FAIL tests/filesys/extended/dir-over-file
-Kernel panic in run: PANIC at ../../userprog/syscall.c:197 in syscall_handler(): NOT ALLOWED SYSCALL NUMBER 16
-Call stack: 0xc002a9a6 0x5f6c6c61d
-Translation of call stack:
-0xc002a9a6: debug_panic (.../../lib/kernel/debug.c:38)
-0x5f6c6c61d: (unknown)
+pass tests/filesys/extended/dir-over-file
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-rm-cwd -a dir-rm-cwd -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-rm-cwd < /dev/null 2> tests/filesys/extended/dir-rm-cwd.errors > tests/filesys/extended/dir-rm-cwd.output
@@ -309,12 +287,7 @@ pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-rm-pare
 pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/dir-rm-parent.tar --swap-size=4 -- -q  run 'tar fs.tar /' < /dev/null 2> tests/filesys/extended/dir-rm-parent-persistence.errors > tests/filesys/extended/dir-rm-parent-persistence.output
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-rm-parent.ck tests/filesys/extended/dir-rm-parent tests/filesys/extended/dir-rm-parent.result
-FAIL tests/filesys/extended/dir-rm-parent
-Kernel panic in run: PANIC at ../../userprog/syscall.c:197 in syscall_handler(): NOT ALLOWED SYSCALL NUMBER 16
-Call stack: 0xc002a9a6 0x5f6c6c61d
-Translation of call stack:
-0xc002a9a6: debug_panic (.../../lib/kernel/debug.c:38)
-0x5f6c6c61d: (unknown)
+pass tests/filesys/extended/dir-rm-parent
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-rm-root -a dir-rm-root -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-rm-root < /dev/null 2> tests/filesys/extended/dir-rm-root.errors > tests/filesys/extended/dir-rm-root.output
@@ -329,35 +302,21 @@ pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/d
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-rm-tree.ck tests/filesys/extended/dir-rm-tree tests/filesys/extended/dir-rm-tree.result
 FAIL tests/filesys/extended/dir-rm-tree
-Kernel panic in run: PANIC at ../../userprog/syscall.c:197 in syscall_handler(): NOT ALLOWED SYSCALL NUMBER 16
-Call stack: 0xc002a9a6 0x5f6c6c61d
-Translation of call stack:
-0xc002a9a6: debug_panic (.../../lib/kernel/debug.c:38)
-0x5f6c6c61d: (unknown)
+run: remove "/0/0/0/0": FAILED
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-rmdir -a dir-rmdir -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-rmdir < /dev/null 2> tests/filesys/extended/dir-rmdir.errors > tests/filesys/extended/dir-rmdir.output
 pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/dir-rmdir.tar --swap-size=4 -- -q  run 'tar fs.tar /' < /dev/null 2> tests/filesys/extended/dir-rmdir-persistence.errors > tests/filesys/extended/dir-rmdir-persistence.output
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-rmdir.ck tests/filesys/extended/dir-rmdir tests/filesys/extended/dir-rmdir.result
-FAIL tests/filesys/extended/dir-rmdir
-Kernel panic in run: PANIC at ../../userprog/syscall.c:197 in syscall_handler(): NOT ALLOWED SYSCALL NUMBER 16
-Call stack: 0xc002a9a6 0x5f6c6c61d
-Translation of call stack:
-0xc002a9a6: debug_panic (.../../lib/kernel/debug.c:38)
-0x5f6c6c61d: (unknown)
+pass tests/filesys/extended/dir-rmdir
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-under-file -a dir-under-file -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-under-file < /dev/null 2> tests/filesys/extended/dir-under-file.errors > tests/filesys/extended/dir-under-file.output
 pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/dir-under-file.tar --swap-size=4 -- -q  run 'tar fs.tar /' < /dev/null 2> tests/filesys/extended/dir-under-file-persistence.errors > tests/filesys/extended/dir-under-file-persistence.output
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-under-file.ck tests/filesys/extended/dir-under-file tests/filesys/extended/dir-under-file.result
-FAIL tests/filesys/extended/dir-under-file
-Kernel panic in run: PANIC at ../../userprog/syscall.c:197 in syscall_handler(): NOT ALLOWED SYSCALL NUMBER 16
-Call stack: 0xc002a9a6 0x5f6c6c61d
-Translation of call stack:
-0xc002a9a6: debug_panic (.../../lib/kernel/debug.c:38)
-0x5f6c6c61d: (unknown)
+pass tests/filesys/extended/dir-under-file
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 150 --bochs  --disk=tmp.dsk -p tests/filesys/extended/dir-vine -a dir-vine -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run dir-vine < /dev/null 2> tests/filesys/extended/dir-vine.errors > tests/filesys/extended/dir-vine.output
@@ -365,11 +324,7 @@ pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/d
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/dir-vine.ck tests/filesys/extended/dir-vine tests/filesys/extended/dir-vine.result
 FAIL tests/filesys/extended/dir-vine
-Kernel panic in run: PANIC at ../../userprog/syscall.c:197 in syscall_handler(): NOT ALLOWED SYSCALL NUMBER 16
-Call stack: 0xc002a9a6 0x5f6c6c61d
-Translation of call stack:
-0xc002a9a6: debug_panic (.../../lib/kernel/debug.c:38)
-0x5f6c6c61d: (unknown)
+run: readdir "." (should fail): FAILED
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/grow-create -a grow-create -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run grow-create < /dev/null 2> tests/filesys/extended/grow-create.errors > tests/filesys/extended/grow-create.output
@@ -383,13 +338,7 @@ pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/grow-dir-lg
 pintos -v -k -T 60  --bochs --disk=tmp.dsk -g fs.tar -a tests/filesys/extended/grow-dir-lg.tar --swap-size=4 -- -q  run 'tar fs.tar /' < /dev/null 2> tests/filesys/extended/grow-dir-lg-persistence.errors > tests/filesys/extended/grow-dir-lg-persistence.output
 rm -f tmp.dsk
 perl -I../.. ../../tests/filesys/extended/grow-dir-lg.ck tests/filesys/extended/grow-dir-lg tests/filesys/extended/grow-dir-lg.result
-FAIL tests/filesys/extended/grow-dir-lg
-Kernel panic in run: PANIC at ../../userprog/syscall.c:197 in syscall_handler(): NOT ALLOWED SYSCALL NUMBER 16
-Call stack: 0xc002a9a6 0x5f6c6c61
-Translation of call stack:
-In kernel.o:
-0xc002a9a6: debug_panic (.../../lib/kernel/debug.c:38)
-0x5f6c6c61: (unknown)
+pass tests/filesys/extended/grow-dir-lg
 rm -f tmp.dsk
 pintos-mkdisk tmp.dsk --filesys-size=2
 pintos -v -k -T 60 --bochs  --disk=tmp.dsk -p tests/filesys/extended/grow-file-size -a grow-file-size -p tests/filesys/extended/tar -a tar --swap-size=4 -- -q  -f run grow-file-size < /dev/null 2> tests/filesys/extended/grow-file-size.errors > tests/filesys/extended/grow-file-size.output
@@ -457,25 +406,30 @@ perl -I../.. ../../tests/filesys/extended/syn-rw.ck tests/filesys/extended/syn-r
 pass tests/filesys/extended/syn-rw
 perl -I../.. ../../tests/filesys/extended/dir-empty-name-persistence.ck tests/filesys/extended/dir-empty-name-persistence tests/filesys/extended/dir-empty-name-persistence.result
 FAIL tests/filesys/extended/dir-empty-name-persistence
-Prerequisite test tests/filesys/extended/dir-empty-name failed.
+Error extracting file system:
+/: open failed
 perl -I../.. ../../tests/filesys/extended/dir-mk-tree-persistence.ck tests/filesys/extended/dir-mk-tree-persistence tests/filesys/extended/dir-mk-tree-persistence.result
 FAIL tests/filesys/extended/dir-mk-tree-persistence
-Prerequisite test tests/filesys/extended/dir-mk-tree failed.
+Error extracting file system:
+/: open failed
 perl -I../.. ../../tests/filesys/extended/dir-mkdir-persistence.ck tests/filesys/extended/dir-mkdir-persistence tests/filesys/extended/dir-mkdir-persistence.result
 FAIL tests/filesys/extended/dir-mkdir-persistence
-Prerequisite test tests/filesys/extended/dir-mkdir failed.
+Error extracting file system:
+/: open failed
 perl -I../.. ../../tests/filesys/extended/dir-open-persistence.ck tests/filesys/extended/dir-open-persistence tests/filesys/extended/dir-open-persistence.result
 FAIL tests/filesys/extended/dir-open-persistence
 Prerequisite test tests/filesys/extended/dir-open failed.
 perl -I../.. ../../tests/filesys/extended/dir-over-file-persistence.ck tests/filesys/extended/dir-over-file-persistence tests/filesys/extended/dir-over-file-persistence.result
 FAIL tests/filesys/extended/dir-over-file-persistence
-Prerequisite test tests/filesys/extended/dir-over-file failed.
+Error extracting file system:
+/: open failed
 perl -I../.. ../../tests/filesys/extended/dir-rm-cwd-persistence.ck tests/filesys/extended/dir-rm-cwd-persistence tests/filesys/extended/dir-rm-cwd-persistence.result
 FAIL tests/filesys/extended/dir-rm-cwd-persistence
 Prerequisite test tests/filesys/extended/dir-rm-cwd failed.
 perl -I../.. ../../tests/filesys/extended/dir-rm-parent-persistence.ck tests/filesys/extended/dir-rm-parent-persistence tests/filesys/extended/dir-rm-parent-persistence.result
 FAIL tests/filesys/extended/dir-rm-parent-persistence
-Prerequisite test tests/filesys/extended/dir-rm-parent failed.
+Error extracting file system:
+/: open failed
 perl -I../.. ../../tests/filesys/extended/dir-rm-root-persistence.ck tests/filesys/extended/dir-rm-root-persistence tests/filesys/extended/dir-rm-root-persistence.result
 FAIL tests/filesys/extended/dir-rm-root-persistence
 Error extracting file system:
@@ -485,10 +439,12 @@ FAIL tests/filesys/extended/dir-rm-tree-persistence
 Prerequisite test tests/filesys/extended/dir-rm-tree failed.
 perl -I../.. ../../tests/filesys/extended/dir-rmdir-persistence.ck tests/filesys/extended/dir-rmdir-persistence tests/filesys/extended/dir-rmdir-persistence.result
 FAIL tests/filesys/extended/dir-rmdir-persistence
-Prerequisite test tests/filesys/extended/dir-rmdir failed.
+Error extracting file system:
+/: open failed
 perl -I../.. ../../tests/filesys/extended/dir-under-file-persistence.ck tests/filesys/extended/dir-under-file-persistence tests/filesys/extended/dir-under-file-persistence.result
 FAIL tests/filesys/extended/dir-under-file-persistence
-Prerequisite test tests/filesys/extended/dir-under-file failed.
+Error extracting file system:
+/: open failed
 perl -I../.. ../../tests/filesys/extended/dir-vine-persistence.ck tests/filesys/extended/dir-vine-persistence tests/filesys/extended/dir-vine-persistence.result
 FAIL tests/filesys/extended/dir-vine-persistence
 Prerequisite test tests/filesys/extended/dir-vine failed.
@@ -498,7 +454,8 @@ Error extracting file system:
 /: open failed
 perl -I../.. ../../tests/filesys/extended/grow-dir-lg-persistence.ck tests/filesys/extended/grow-dir-lg-persistence tests/filesys/extended/grow-dir-lg-persistence.result
 FAIL tests/filesys/extended/grow-dir-lg-persistence
-Prerequisite test tests/filesys/extended/grow-dir-lg failed.
+Error extracting file system:
+/: open failed
 perl -I../.. ../../tests/filesys/extended/grow-file-size-persistence.ck tests/filesys/extended/grow-file-size-persistence tests/filesys/extended/grow-file-size-persistence.result
 FAIL tests/filesys/extended/grow-file-size-persistence
 Error extracting file system:
@@ -612,20 +569,20 @@ pass tests/filesys/base/sm-seq-random
 pass tests/filesys/base/syn-read
 pass tests/filesys/base/syn-remove
 pass tests/filesys/base/syn-write
-FAIL tests/filesys/extended/dir-empty-name
-FAIL tests/filesys/extended/dir-mk-tree
-FAIL tests/filesys/extended/dir-mkdir
+pass tests/filesys/extended/dir-empty-name
+pass tests/filesys/extended/dir-mk-tree
+pass tests/filesys/extended/dir-mkdir
 FAIL tests/filesys/extended/dir-open
-FAIL tests/filesys/extended/dir-over-file
+pass tests/filesys/extended/dir-over-file
 FAIL tests/filesys/extended/dir-rm-cwd
-FAIL tests/filesys/extended/dir-rm-parent
+pass tests/filesys/extended/dir-rm-parent
 pass tests/filesys/extended/dir-rm-root
 FAIL tests/filesys/extended/dir-rm-tree
-FAIL tests/filesys/extended/dir-rmdir
-FAIL tests/filesys/extended/dir-under-file
+pass tests/filesys/extended/dir-rmdir
+pass tests/filesys/extended/dir-under-file
 FAIL tests/filesys/extended/dir-vine
 pass tests/filesys/extended/grow-create
-FAIL tests/filesys/extended/grow-dir-lg
+pass tests/filesys/extended/grow-dir-lg
 pass tests/filesys/extended/grow-file-size
 pass tests/filesys/extended/grow-root-lg
 pass tests/filesys/extended/grow-root-sm
@@ -658,5 +615,7 @@ FAIL tests/filesys/extended/grow-sparse-persistence
 FAIL tests/filesys/extended/grow-tell-persistence
 FAIL tests/filesys/extended/grow-two-files-persistence
 FAIL tests/filesys/extended/syn-rw-persistence
-37 of 125 tests failed.
+29 of 125 tests failed.
 ../../tests/Make.tests:26: recipe for target 'check' failed
+make[1]: Leaving directory '/workspace/pintos_v/pintos/src/filesys/build'
+../Makefile.kernel:10: recipe for target 'check' failed
