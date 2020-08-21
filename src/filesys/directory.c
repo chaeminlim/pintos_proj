@@ -7,7 +7,7 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 
-bool dir_is_empty (const struct dir *dir);
+
 /* A directory. */
 struct dir 
   {
@@ -28,20 +28,24 @@ struct dir_entry
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
-  bool status = inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
+  bool status = inode_create(sector, entry_cnt * sizeof (struct dir_entry), true);
   if(!status) return false;
 
   struct dir* dir = dir_open(inode_open(sector));
   if(dir == NULL) NOT_REACHED();
+
   struct dir_entry entry;
+  
   entry.inode_sector = sector;
   entry.in_use = true;
   memcpy(entry.name, ".", 2);
+  
   if(inode_write_at(dir->inode, &entry, sizeof(struct dir_entry), 0) != sizeof(struct dir_entry))
   {
     status = false;
   }
-  if(sector == ROOT_DIR_SECTOR)
+
+  if(sector == ROOT_DIR_SECTOR) // 루트 디렉터리라면 부모를 가리키는 
   {
     entry.inode_sector = sector;
     entry.in_use = true;
@@ -51,13 +55,14 @@ dir_create (block_sector_t sector, size_t entry_cnt)
       status = false;
     } 
   }
+  
   dir_close(dir);
   return status; 
-  //return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
 }
 
 /* Opens and returns the directory for the given INODE, of which
    it takes ownership.  Returns a null pointer on failure. */
+   // inode open 이 실패하면 inode도 닫음
 struct dir *
 dir_open (struct inode *inode) 
 {
@@ -86,6 +91,7 @@ dir_open_root (void)
 
 /* Opens and returns a new directory for the same inode as DIR.
    Returns a null pointer on failure. */
+   // inode reopen은 카운트만 올리고 추가 할당을 하지는 않는다.
 struct dir *
 dir_reopen (struct dir *dir) 
 {
@@ -148,7 +154,9 @@ lookup (const struct dir *dir, const char *name,
 /* Searches DIR for a file with the given NAME
    and returns true if one exists, false otherwise.
    On success, sets *INODE to an inode for the file, otherwise to
-   a null pointer.  The caller must close *INODE. */
+   a null pointer.  The caller must close *INODE. 
+   dir lookup을 하면, inode open을 하기 때문에 inode -close를 꼭 해줘야 한다.
+   */
 bool
 dir_lookup (const struct dir *dir, const char *name, struct inode **inode) 
 {
@@ -196,16 +204,16 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector, bool is
   // 자식을 만들 떄, 부모로서 설정해준다.
   if(inode_sector != ROOT_DIR_SECTOR)
   {
-    if(is_dir)
+    if(is_dir) // 디렉토리 일 때,
     {
       struct dir* child_dir = dir_open(inode_open(inode_sector));
       if(child_dir == NULL) NOT_REACHED();
       e.inode_sector = inode_get_inumber(dir_get_inode(dir));
       e.in_use = true;
-      strlcpy(e.name, "..", 3);
+      memcpy(e.name, "..", 3);
       if(inode_write_at(child_dir->inode, &e, sizeof(e), sizeof(e)) != sizeof(e))
         NOT_REACHED();
-      
+      dir_close(child_dir);
     }
   }
   /* Set OFS to offset of free slot.
@@ -219,7 +227,6 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector, bool is
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e)
   {
-   
     if (!e.in_use)
       break;
   }
@@ -230,9 +237,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector, bool is
   strlcpy (e.name, name, sizeof e.name);
   e.inode_sector = inode_sector;
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-/* 
-  if(is_dir)
-    PANIC("DDDDDDDDDDDD success %d name %s is_dir %d", success, name, is_dir); */
+
  done:
   return success;
 }
@@ -307,7 +312,9 @@ void divide_path_str(const char* name, char* directory, char* file_name)
 {
   // 슬래쉬로 끝난다면 // 전부다 디렉토리
   // 슬래시로 끝나지 않는다면 디렉토리 또는 파일
-  // 슬래시로 시작한다면 절대경로
+  // 슬래시로 끝나지 않을 때, 마지막 인덱스부터 슬래시를 찾음
+  // 슬래시를 찾았다면, 슬래시까지 경로
+  // 슬래시를 찾지 못했다면 전부 파일
   int length = strlen(name);
   if(length < 0) NOT_REACHED();
   if(length == 0)
@@ -334,13 +341,13 @@ void divide_path_str(const char* name, char* directory, char* file_name)
         break;
       }
     }
-    if(!flag) // cannot find slash
+    if(!flag) // 슬래시를 못찾았다면
     {
       directory[0] = '\0';
       memcpy(file_name, name, length + 1);
       return;
     }
-    else
+    else // 슬래시를 찾았다면
     {
       memcpy(directory, name, moving_idx + 1);
       directory[moving_idx + 1] = '\0';
@@ -357,7 +364,7 @@ struct dir* get_dir_from_path(const char* directory)
   char temp_dir[length+1];
 
   if(length < 0) NOT_REACHED();
-  if(length == 0)
+  if(length == 0) // 디렉토리가 없을 때, 현재 디렉토리이거나 루트
   {
     if(thread_current()->current_dir == NULL)
       current = dir_open_root();
@@ -367,10 +374,9 @@ struct dir* get_dir_from_path(const char* directory)
   }
   
   strlcpy(temp_dir, directory, length + 1);
-  bool is_absolute = (directory[0] == '/');
+  bool is_absolute = (temp_dir[0] == '/'); // 절대 경로 플래그
   
-  
-  if(is_absolute)
+  if(is_absolute) // 절대 경로일 때 현재 디렉터리는 루트
     current = dir_open_root();
   else
   {
@@ -379,9 +385,11 @@ struct dir* get_dir_from_path(const char* directory)
     else
       current = dir_reopen(thread_current()->current_dir);
   }
+
   // set current done
   char* token, *save_ptr;
-  for(token = strtok_r(temp_dir, "/", &save_ptr); token != NULL; token = strtok_r(NULL, "/", &save_ptr))
+  token = strtok_r(temp_dir, "/", &save_ptr);
+  for(; token != NULL; token = strtok_r(NULL, "/", &save_ptr))
   {
     struct inode* inode = NULL;
     if(!dir_lookup(current, token, &inode))
@@ -394,7 +402,6 @@ struct dir* get_dir_from_path(const char* directory)
       struct dir* next = dir_open(inode);
       if(next == NULL)
       {
-        dir_close(current); 
         return NULL;
       }
       dir_close(current);
@@ -427,3 +434,30 @@ bool dir_is_empty (const struct dir *dir)
   return true;
 }
 
+void get_dir_name(struct dir* dir, char* name)
+{
+  ASSERT(dir != NULL);
+  struct dir_entry e;
+  inode_read_at(dir->inode, &e, sizeof e, 0);
+  memcpy(name, e.name, NAME_MAX + 1);
+}
+
+void print_all_subdir(struct dir* dir)
+{
+  struct dir_entry e;
+  off_t ofs = 0;
+  printf("SUBDIR START\n");
+  if(inode_removed(dir->inode))
+  {
+    printf("inode is removed!\n");
+  }
+  if(!inode_is_dir(dir->inode))
+  {
+    printf("Not dir!\n");
+  }
+  for (; inode_read_at(dir->inode, &e, sizeof e, ofs) == sizeof e; ofs += sizeof e)
+  {
+    if (e.in_use)
+      printf("SUBDIR :%s\n", e.name);
+  }
+}

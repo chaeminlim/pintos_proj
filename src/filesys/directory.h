@@ -28,4 +28,7 @@ bool dir_remove (struct dir *, const char *name);
 bool dir_readdir (struct dir *, char name[NAME_MAX + 1]);
 void divide_path_str(const char* name, char* directory, char* file_name);
 struct dir* get_dir_from_path(const char* directory);
+bool dir_is_empty (const struct dir *dir);
+void get_dir_name(struct dir* dir, char* name);
+void print_all_subdir(struct dir* dir);
 #endif /* filesys/directory.h */

@@ -65,7 +65,8 @@ static void
 syscall_handler (struct intr_frame *f)
 { 
   int syscall_number = *(int*)(f->esp);
-  //printf ("system call! number: %d\n", syscall_number);
+ /*  if(syscall_number != 9)
+    printf ("system call! number: %d\n", syscall_number); */
   switch(syscall_number)
   {
     case SYS_HALT:
@@ -85,8 +86,8 @@ syscall_handler (struct intr_frame *f)
     {
       is_safe_addr(f->esp + 4);
       char* cmd_line = (char*)*((int*)f->esp + 1);
-      uint32_t return_code = exec(cmd_line);
-      f->eax = return_code;
+      is_string_safe(cmd_line);
+      f->eax = exec(cmd_line);
       break;
     }
     case SYS_WAIT:
@@ -269,11 +270,14 @@ tid_t exec(const char *file)
 {
   tid_t tid;
   struct thread* child;
-  if ((tid = process_execute (file)) == -1) return -1;
+  if ((tid = process_execute (file)) == -1) 
+    goto EXEC_ERR;
   child = get_child_thread(tid);
   ASSERT (child);
   sema_down (&child->sema_load);
-  if (!child->load_status) return -1;
+  if (!child->load_status) tid = -1;
+  
+EXEC_ERR:
   return tid;
 }
 
@@ -394,10 +398,16 @@ int open(char *file)
     return fd_num;
   }
 
-  if (inode == NULL || inode_removed(inode))
+  if (inode == NULL)
   {
     lock_release(&filesys_lock);
     return -1; 
+  }
+  if(inode_removed(inode))
+  {
+    inode_close(inode); 
+    lock_release(&filesys_lock);
+    return -1;
   }
 
   int fd_num = allocate_fd_id(thread_current());
@@ -508,7 +518,6 @@ void is_safe_addr(void* vaddr)
 void is_buffer_safe(void* buffer, unsigned size)
 {
   void* temp_buffer = buffer;
-  is_safe_addr(buffer); 
   is_safe_addr((void*)((unsigned)buffer + size)); 
   void* vaddr_last = pg_round_down((void*)((unsigned)buffer + size));
   struct vm_area_struct* vma;
@@ -517,8 +526,8 @@ void is_buffer_safe(void* buffer, unsigned size)
   {
     temp_buffer = pg_round_down(temp_buffer);
     vma = get_vma_with_vaddr(thread_current()->mm_struct, temp_buffer);
-    if(vma == NULL) {  exit(-1);}
-    if(vma->read_only) exit(-1);
+    if(vma == NULL) {  exit(-1); }
+    if(vma->read_only) exit(-1) ;
     if(vma->loaded != PG_LOADED) allocate_vm_page_mm(vma);
     vma->pinned = true;
     if(temp_buffer == vaddr_last) break;

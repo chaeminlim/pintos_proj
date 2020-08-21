@@ -7,7 +7,10 @@
 #include "filesys/inode.h"
 #include "filesys/directory.h"
 #include "filesys/buff-cache.h"
+#include "userprog/syscall.h"
+#include "threads/synch.h"
 
+extern struct lock filesys_lock;
 /* Partition that contains the file system. */
 struct block *fs_device;
 
@@ -59,8 +62,10 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 /*   printf("DIR %s, size %d\n", directory_str, strlen(directory_str));
   printf("FIL %s, size %d\n", file_name_str, strlen(file_name_str)); */
   struct dir *dir = get_dir_from_path(directory_str);
-  bool success;
+  bool success = false;
 
+  if(strlen(file_name_str) <= 0) goto FSCREATE_DONE;
+  
   if(!is_dir)
   {
     success = (dir != NULL
@@ -69,11 +74,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
                 && dir_add (dir, file_name_str, inode_sector, is_dir)); 
   }
   else
-  {/* 
-    if(dir == NULL) NOT_REACHED();
-    if(!(free_map_allocate (1, &inode_sector))) NOT_REACHED();
-    if(!(dir_create (inode_sector, initial_size))) NOT_REACHED();
-    if(!(dir_add (dir, name, inode_sector, is_dir))) NOT_REACHED(); */
+  {
     success = (dir != NULL
                 && free_map_allocate (1, &inode_sector)
                 && dir_create (inode_sector, initial_size)
@@ -84,6 +85,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);
 
+FSCREATE_DONE:
   dir_close (dir);
   return success;
 }
@@ -100,26 +102,30 @@ filesys_open (const char *name)
   char directory_str[strlen(name)+1];
   char file_name_str[strlen(name)+1];
   divide_path_str(name, directory_str, file_name_str);
+  struct dir *dir = get_dir_from_path(directory_str);
   /* 
   printf("DIR %s, size %d\n", directory_str, strlen(directory_str));
-  printf("FIL %s, size %d\n", file_name_str, strlen(file_name_str)); */
-  struct dir *dir = get_dir_from_path(directory_str);
+  printf("FIL %s, size %d\n", file_name_str, strlen(file_name_str)); 
+  */
   struct inode *inode = NULL;
+  
   if(dir == NULL) return NULL;
 
   if (strlen(file_name_str) > 0) 
   {
     dir_lookup(dir, file_name_str, &inode);
     dir_close(dir);
+    if(inode == NULL) goto FSOPEN_INODE_F;
+    if(inode_removed(inode)) goto FSOPEN_INODE_F;
+    if(strlen(file_name_str) <= 0) goto FSOPEN_INODE_F;
+    if(inode_is_dir(inode)) NOT_REACHED();
+
+    return file_open (inode);
   }
-  if (inode == NULL || 
-      inode_removed(inode) || 
-      !(strlen(file_name_str) > 0) ||
-      inode_is_dir(inode))
-  {
-    return NULL; 
-  }
-  return file_open (inode);
+
+FSOPEN_INODE_F:
+  inode_close(inode); // null이면 그냥 끝남
+  return NULL;
 }
 
 /* Deletes the file named NAME.
@@ -129,6 +135,7 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
+  ASSERT(lock_held_by_current_thread(&filesys_lock));
   /* printf("REMOVE !!! %s\n", name); */
   char directory_str[strlen(name)+1];
   char file_name_str[strlen(name)+1];
@@ -144,9 +151,11 @@ filesys_remove (const char *name)
   {
     if(!dir_lookup(dir, file_name_str, &inode))
     {
+      // lookup을 fail함
       printf("REMOVE !!! %s\n", name);
       printf("DIR %s, size %d\n", directory_str, strlen(directory_str));
       printf("FIL %s, size %d\n", file_name_str, strlen(file_name_str));
+      print_all_subdir(dir);
       
       dir_close(dir);
       return false;

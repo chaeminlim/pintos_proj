@@ -199,7 +199,7 @@ bool allocate_inode_disk(struct inode_disk* disk_inode, off_t length, bool exten
   size_t sector_num = bytes_to_sectors(length); // 필요한 섹터의 개수
   size_t temp_sector = (sector_num < DIRECT_BLOCK_NUM ? sector_num : DIRECT_BLOCK_NUM);
   // direct disk에 할당
-  if(!allocate_new_direct_disk(disk_inode, temp_sector, extend)) PANIC("allocate direct block fail!");
+  if(!allocate_new_direct_disk(disk_inode, temp_sector, extend)) return false;
   // 할당 끝나면 변수 업데이트
   if(sector_num < temp_sector) NOT_REACHED();
   sector_num -= temp_sector;
@@ -493,7 +493,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   if(byte_to_sector(inode, offset + size - 1) == -1u ) 
   {
-    if(!inode_extend(&inode->data, offset + size)) PANIC("Inode extend failed");
+    if(!inode_extend(&inode->data, offset + size)) return -1;
 
     // write back the (extended) file size
     inode->data.length = offset + size;

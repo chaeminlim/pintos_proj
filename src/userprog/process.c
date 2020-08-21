@@ -82,7 +82,8 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
 
   t->load_status = load(file_name, &if_.eip, &if_.esp);
-  
+  free(file_name_);
+
   #ifdef FILESYS
   // setting dir
   if(t->parent != NULL && t->parent->current_dir != NULL)
@@ -96,13 +97,15 @@ start_process (void *file_name_)
   #endif
   /* If load failed, quit. */
   //hex_dump( if_.esp,  if_.esp, PHYS_BASE -  if_.esp, true);
+  //printf("sema up! %d\n", t->tid);
   sema_up(&t->sema_load); // 부모의 exec을 재개 시킨다
   //palloc_free_page (pg_round_down(file_name));
-  free(file_name_);
   if (!t->load_status) 
   {
     exit(-1);
   }
+
+  
   //set_argument_stack(file_name, )
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -141,6 +144,7 @@ process_wait (tid_t child_tid)
   exit_status = child->exit_code;
   sema_up(&child->sema_exit);
   return exit_status;
+
 }
 /* Free the current process's resources. */
 void
@@ -188,41 +192,28 @@ process_exit (void)
   free(cur->mm_struct);
   ASSERT(cur->target_lock == NULL);
 
-  struct list_elem *child;
-  if(!list_empty(&cur->child_list))
-  {
-    for (child = list_begin (&cur->child_list);
-          child != list_end (&cur->child_list); )
-    {
-      struct thread *t = list_entry(child, struct thread, child_list_elem);
-      child = list_remove (child);
-      sema_up(&t->sema_exit);
-    }
-  }
-  sema_up(&cur->sema_wait);
+  if(cur->current_dir) dir_close(cur->current_dir);
+
   cur->exit_status = true;
-  
+  sema_up(&cur->sema_wait);
   sema_down(&cur->sema_exit);
 
-  // close dir
-  if(cur->current_dir) dir_close(cur->current_dir);
-  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
   if (pd != NULL) 
-    {
-      /* Correct ordering here is crucial.  We must set
-         cur->pagedir to NULL before switching page directories,
-         so that a timer interrupt can't switch back to the
-         process page directory.  We must activate the base page
-         directory before destroying the process's page
-         directory, or our active page directory will be one
-         that's been freed (and cleared). */
-      cur->pagedir = NULL;
-      pagedir_activate (NULL);
-      pagedir_destroy(pd);
-    }
+  {
+    /* Correct ordering here is crucial.  We must set
+        cur->pagedir to NULL before switching page directories,
+        so that a timer interrupt can't switch back to the
+        process page directory.  We must activate the base page
+        directory before destroying the process's page
+        directory, or our active page directory will be one
+        that's been freed (and cleared). */
+    cur->pagedir = NULL;
+    pagedir_activate (NULL);
+    pagedir_destroy(pd);
+  }
 }
 
 /* Sets up the CPU for running user code in the current
