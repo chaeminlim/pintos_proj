@@ -7,76 +7,70 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 
-struct semaphore buffer_cache_writer_sema;
-struct semaphore buffer_cache_reader_sema;
+struct lock buffer_cache_lock;
 struct buffer_cache_entry Buffer_Cache[BUFFER_CACHE_SIZE];
-int bce_clock = -1;
 bool is_full = false;
-int reader_count = 0;
 
-void write_back(struct buffer_cache_entry* bce);
-int find_in_cache(struct block* block, block_sector_t t);
+void write_back(int index);
+int find_in_cache(block_sector_t t);
 int clock_buffer(void);
 
 void init_buffer_cache(void)
 {
-    sema_init(&buffer_cache_writer_sema, 1);
-    sema_init(&buffer_cache_reader_sema, 1);
-    
+    lock_init(&buffer_cache_lock);
+
     int i = 0;
     for(; i < BUFFER_CACHE_SIZE; i++)
     {
+        Buffer_Cache[i].valid = false;
         Buffer_Cache[i].accessed = false;
         Buffer_Cache[i].dirty = false;
-        Buffer_Cache[i].valid = false;
-        Buffer_Cache[i].disk_sector_num = -1;
-        Buffer_Cache[i].block_device = NULL;
     }
 }
 
 void block_buffer_read(struct block *block, block_sector_t sector, void *buffer)
 {
     if(sector == NABLOCK) PANIC("READ ON NABLOCK");
-    sema_down(&buffer_cache_reader_sema);
-    reader_count++; if(reader_count == 1) sema_down(&buffer_cache_writer_sema);
-    sema_up(&buffer_cache_reader_sema);
     
-    int buffer_index = find_in_cache(block, sector);
-    if(buffer_index == -1) //not found
+    lock_acquire(&buffer_cache_lock);
+    
+    int buffer_index = find_in_cache(sector);
+    if(buffer_index == -1) // not found
     {
         buffer_index = clock_buffer();
-        block_read(block, sector, Buffer_Cache[buffer_index].block);
-        Buffer_Cache[buffer_index].valid = true;
+        Buffer_Cache[buffer_index].valid = true; 
+        Buffer_Cache[buffer_index].dirty = false; 
         Buffer_Cache[buffer_index].disk_sector_num = sector;
         Buffer_Cache[buffer_index].block_device = block;
+        block_read(block, sector, Buffer_Cache[buffer_index].block);
     }    
-    else // found
+    else // cache hit
     {
         if(buffer_index >= BUFFER_CACHE_SIZE) NOT_REACHED();
         if(!Buffer_Cache[buffer_index].valid) NOT_REACHED();
     }
 
-    memcpy(buffer, Buffer_Cache[buffer_index].block, BLOCK_SECTOR_SIZE); 
     Buffer_Cache[buffer_index].accessed = true;
+    memcpy(buffer, Buffer_Cache[buffer_index].block, BLOCK_SECTOR_SIZE); 
     
-    sema_down(&buffer_cache_reader_sema);
-    reader_count--; if(reader_count == 0) sema_up(&buffer_cache_writer_sema);
-    sema_up(&buffer_cache_reader_sema);
-    
+    lock_release(&buffer_cache_lock);
 }
 
 void block_buffer_write(struct block *block, block_sector_t sector, const void *buffer)
 {
     if(sector == NABLOCK) PANIC("WRITE ON NABLOCK");
-    sema_down(&buffer_cache_writer_sema);
-    int buffer_index = find_in_cache(block, sector);
+    lock_acquire(&buffer_cache_lock);
+
+    int buffer_index = find_in_cache(sector);
     if(buffer_index == -1) //not found
     {
         buffer_index = clock_buffer();
-        block_read(block, sector, Buffer_Cache[buffer_index].block);
         Buffer_Cache[buffer_index].valid = true;
         Buffer_Cache[buffer_index].disk_sector_num = sector;
         Buffer_Cache[buffer_index].block_device = block;
+        Buffer_Cache[buffer_index].dirty = false;
+        block_read(block, sector, Buffer_Cache[buffer_index].block);
+        
     }    
     else // found
     {
@@ -84,74 +78,69 @@ void block_buffer_write(struct block *block, block_sector_t sector, const void *
         if(!Buffer_Cache[buffer_index].valid) NOT_REACHED();
     }
     
-    memcpy(Buffer_Cache[buffer_index].block, buffer, BLOCK_SECTOR_SIZE); 
     Buffer_Cache[buffer_index].accessed = true;
     Buffer_Cache[buffer_index].dirty = true;
-    sema_up(&buffer_cache_writer_sema);
+    memcpy(Buffer_Cache[buffer_index].block, buffer, BLOCK_SECTOR_SIZE); 
+
+    lock_release(&buffer_cache_lock);
 }
 
 void remove_buffer_cache(void)
 {
-    sema_down(&buffer_cache_writer_sema);
+    lock_acquire(&buffer_cache_lock);
     int i = 0;
     for(; i < BUFFER_CACHE_SIZE; i++)
     {
         if(Buffer_Cache[i].valid)
         {
-            if(Buffer_Cache[i].dirty)
-            {
-                write_back(&Buffer_Cache[i]);
-            }
+            write_back(i);
         }
     }
-    sema_up(&buffer_cache_writer_sema);
+   lock_release(&buffer_cache_lock);
 }
 
-void write_back(struct buffer_cache_entry* bce)
+void write_back(int index)
 {
-    if(bce->disk_sector_num == NABLOCK) PANIC("NOT allowed disk sector");
-    block_write(bce->block_device, bce->disk_sector_num, bce->block);
-    bce->dirty = false;
+    ASSERT(lock_held_by_current_thread(&buffer_cache_lock));
+    ASSERT(Buffer_Cache[index].valid);
+
+    if(Buffer_Cache[index].dirty)
+    {
+        block_write(Buffer_Cache[index].block_device, Buffer_Cache[index].disk_sector_num, Buffer_Cache[index].block);
+        Buffer_Cache[index].dirty = false;
+    }
 }
 
-int find_in_cache(struct block* block, block_sector_t sector)
+int find_in_cache(block_sector_t sector)
 {
     int i = 0;
-    for(; i < BUFFER_CACHE_SIZE; i++)
+    for (i = 0; i < BUFFER_CACHE_SIZE; ++ i)
     {
-        if(Buffer_Cache[i].disk_sector_num == sector && Buffer_Cache[i].block_device == block) return i;
+    if (Buffer_Cache[i].valid == false) continue;
+    if (Buffer_Cache[i].disk_sector_num == sector) return i;
     }
     return -1;
 }
 
 int clock_buffer(void)
 {
-    while(1)
+    ASSERT(lock_held_by_current_thread(&buffer_cache_lock));
+    int clock = 0;
+    
+    while(1) // find not occupied.
     {
-        if(bce_clock == -1 || bce_clock >= BUFFER_CACHE_SIZE)
-        {
-            bce_clock = 0; continue;
-        }
-        else
-        {
-            if(Buffer_Cache[bce_clock].accessed == true)
-            {
-                Buffer_Cache[bce_clock].accessed = false;
-                bce_clock++;
-                continue;
-            }
-            else
-                break;   
-        }
+        if(Buffer_Cache[clock].valid == false) return clock;
+        if(Buffer_Cache[clock].accessed) Buffer_Cache[clock].accessed = false;
+        else break;
+        clock++;
+        clock %= BUFFER_CACHE_SIZE;
     }
 
-    if(Buffer_Cache[bce_clock].dirty == true)
+    if(Buffer_Cache[clock].dirty)
     {
-        if(Buffer_Cache[bce_clock].valid == true) write_back(&Buffer_Cache[bce_clock]);
+        write_back(clock);
     }
-    
-    Buffer_Cache[bce_clock].accessed = true;
-    Buffer_Cache[bce_clock].dirty = false;
-    
-    return bce_clock;
+
+    Buffer_Cache[clock].valid = false;
+    return clock;
 }
