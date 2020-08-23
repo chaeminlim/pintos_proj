@@ -258,18 +258,18 @@ bool free_inode_disk(struct inode_disk* disk_inode)
   // indirect level allocation
   temp_sector = (sector_num < INDIRECT_BLOCK_NUM ? sector_num : INDIRECT_BLOCK_NUM);
 
-  struct indirect_block indi_block;
-  block_buffer_read(fs_device, disk_inode->indirect_blocks, &indi_block);
+  struct indirect_block* indi_block = calloc(1, sizeof(struct indirect_block));
+  block_buffer_read(fs_device, disk_inode->indirect_blocks, indi_block);
   ASSERT (sizeof(struct indirect_block) == BLOCK_SECTOR_SIZE);
 
   for(i = 0; i < temp_sector; i++)
   {
-    if(indi_block.blocks[i] == NABLOCK) 
+    if(indi_block->blocks[i] == NABLOCK) 
       PANIC("FREE NOT ALLOCATED BLOCK");
-    free_map_release(indi_block.blocks[i], 1);
+    free_map_release(indi_block->blocks[i], 1);
   }
   free_map_release(disk_inode->indirect_blocks, 1);
-
+  free(indi_block);
   sector_num -= temp_sector;
   if(sector_num == 0) return true;
 
@@ -279,27 +279,29 @@ bool free_inode_disk(struct inode_disk* disk_inode)
   size_t indirect_block_needed = (temp_sector / INDIRECT_BLOCK_NUM); // 할당해야 하는 indirect 수 - 1
   size_t block_left =  temp_sector % INDIRECT_BLOCK_NUM; // 마지막 indirect에서 할당해야하는 블럭 수
 
-  struct double_indirect_block double_indi_block;
-  block_buffer_read(fs_device, disk_inode->double_indirect_blocks, &double_indi_block);
-  struct indirect_block temp_indi_block;
+  struct double_indirect_block* double_indi_block = calloc(1, sizeof(struct double_indirect_block));
+  block_buffer_read(fs_device, disk_inode->double_indirect_blocks, double_indi_block);
+  struct indirect_block* temp_indi_block = calloc(1, sizeof(struct indirect_block));
 
   for(i = 0; i < indirect_block_needed; i++)
   {
-    block_buffer_read(fs_device, double_indi_block.indirect_blocks[i], &temp_indi_block);
+    block_buffer_read(fs_device, double_indi_block->indirect_blocks[i], temp_indi_block);
     for(j = 0; j < INDIRECT_BLOCK_NUM; j++)
     {
-      free_map_release(temp_indi_block.blocks[j], 1);
+      free_map_release(temp_indi_block->blocks[j], 1);
     }
-    free_map_release(double_indi_block.indirect_blocks[i], 1);
+    free_map_release(double_indi_block->indirect_blocks[i], 1);
   }
 
-  block_buffer_read(fs_device, double_indi_block.indirect_blocks[indirect_block_needed], &temp_indi_block);
+  block_buffer_read(fs_device, double_indi_block->indirect_blocks[indirect_block_needed], temp_indi_block);
   for(j = 0; j < block_left; j++)
   {
-    free_map_release(temp_indi_block.blocks[j], 1);
+    free_map_release(temp_indi_block->blocks[j], 1);
   }
-  free_map_release(double_indi_block.indirect_blocks[indirect_block_needed], 1);
+  free_map_release(double_indi_block->indirect_blocks[indirect_block_needed], 1);
   free_map_release(disk_inode->double_indirect_blocks, 1);
+  free(double_indi_block);
+  free(temp_indi_block);
   return true;
 }
 
