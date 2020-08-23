@@ -137,7 +137,7 @@ bool allocate_extend_double_indirect_disk(struct inode_disk* disk_inode, size_t 
 bool allocate_new_direct_disk(struct inode_disk* disk_inode, size_t needed_blocks, bool extend)
 {
   size_t i;
-  if(!extend) memset(disk_inode->direct_blocks, NABLOCK, sizeof(disk_inode->direct_blocks));
+  
   for(i = 0; i < needed_blocks; i++)
   {
     if(disk_inode->direct_blocks[i] == NABLOCK)
@@ -158,7 +158,7 @@ bool allocate_new_indirect_disk(block_sector_t* sector, size_t needed_blocks, bo
   size_t i;
   struct indirect_block indi_block;
   
-  if(!extend || *sector == NABLOCK)
+  if(*sector == NABLOCK)
   {
     if(!free_map_allocate(1, sector)) return false;
     memset(&indi_block, NABLOCK, sizeof(indi_block));
@@ -167,7 +167,6 @@ bool allocate_new_indirect_disk(block_sector_t* sector, size_t needed_blocks, bo
   { 
     block_buffer_read(fs_device, *sector, &indi_block);
   }
-  ASSERT (sizeof(struct indirect_block) == BLOCK_SECTOR_SIZE);
 
   for(i = 0; i < needed_blocks; i++)
   {
@@ -192,14 +191,12 @@ bool allocate_new_double_indirect_disk(struct inode_disk* disk_inode, size_t nee
   size_t block_left =  needed_blocks % INDIRECT_BLOCK_NUM; // 마지막 indirect에서 할당해야하는 블럭 수
 
   struct double_indirect_block double_indi_block;
-  if(!extend || disk_inode->double_indirect_blocks == NABLOCK)
+  if(disk_inode->double_indirect_blocks == NABLOCK)
   {
     if(!free_map_allocate(1, &disk_inode->double_indirect_blocks)) return false;
     memset(&double_indi_block, NABLOCK, sizeof(double_indi_block));
   }
   else block_buffer_read(fs_device, disk_inode->double_indirect_blocks, &double_indi_block);
-
-  ASSERT (sizeof(struct double_indirect_block) == BLOCK_SECTOR_SIZE);
 
   for(i = 0; i < indirect_block_last_index; i++)
   {
@@ -251,7 +248,8 @@ bool free_inode_disk(struct inode_disk* disk_inode)
   size_t temp_sector = (sector_num < DIRECT_BLOCK_NUM ? sector_num : DIRECT_BLOCK_NUM);
   for(i = 0; i < temp_sector; i++)
   {
-    if(disk_inode->direct_blocks[i] == NABLOCK) PANIC("FREE NOT ALLOCATED BLOCK");
+    if(disk_inode->direct_blocks[i] == NABLOCK) 
+      PANIC("FREE NOT ALLOCATED BLOCK");
     free_map_release(disk_inode->direct_blocks[i], 1);
   }
   sector_num -= temp_sector;
@@ -266,6 +264,8 @@ bool free_inode_disk(struct inode_disk* disk_inode)
 
   for(i = 0; i < temp_sector; i++)
   {
+    if(indi_block.blocks[i] == NABLOCK) 
+      PANIC("FREE NOT ALLOCATED BLOCK");
     free_map_release(indi_block.blocks[i], 1);
   }
   free_map_release(disk_inode->indirect_blocks, 1);
