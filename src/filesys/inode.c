@@ -7,6 +7,8 @@
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
 #include "filesys/buff-cache.h"
+#include <stdio.h>
+
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 #define DIRECT_BLOCK_NUM 123
@@ -67,30 +69,38 @@ static block_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) 
 {
   ASSERT (inode != NULL);
-  if (pos < inode->data.length)
+  if (0 <= pos && pos < inode->data.length)
   {
     size_t sector_num = pos / BLOCK_SECTOR_SIZE;
-    if(sector_num < 123)
+    if(sector_num < DIRECT_BLOCK_NUM)
     {
       return inode->data.direct_blocks[sector_num];
     }
-    else if(sector_num >= 123 && sector_num < 251)
+    else if(sector_num >= DIRECT_BLOCK_NUM && sector_num < (INDIRECT_BLOCK_NUM + DIRECT_BLOCK_NUM))
     {
-      sector_num -= 123; // 0 ~
-      struct indirect_block indi_block;
-      block_buffer_read(fs_device, inode->data.indirect_blocks, &indi_block);
-      return indi_block.blocks[sector_num];
+      struct indirect_block* indi_block = calloc(1, sizeof(struct indirect_block));
+      sector_num -= DIRECT_BLOCK_NUM; // 0 ~
+      ASSERT(inode->data.indirect_blocks != NABLOCK);
+      block_buffer_read(fs_device, inode->data.indirect_blocks, indi_block);
+      block_sector_t ret = indi_block->blocks[sector_num];
+      free(indi_block);
+      return ret;
     }
-    else if(sector_num >= 251 && sector_num <= 16635)
+    else if(sector_num >= 251 && sector_num < (INDIRECT_BLOCK_NUM + DIRECT_BLOCK_NUM + DOUBLE_INDIRECT_BLOCK_NUM))
     {
-      sector_num -= 251; // 0 ~
+      struct double_indirect_block* double_indi_block = calloc(1, sizeof(struct double_indirect_block));;
+      struct indirect_block* indi_block = calloc(1, sizeof(struct indirect_block));;
+      sector_num -= (INDIRECT_BLOCK_NUM + DIRECT_BLOCK_NUM);
       size_t indirect_block_num = sector_num / INDIRECT_BLOCK_NUM;
       size_t indirect_block_index = sector_num % INDIRECT_BLOCK_NUM;
-      struct double_indirect_block double_indi_block;
-      block_buffer_read(fs_device, inode->data.double_indirect_blocks, &double_indi_block);
-      struct indirect_block indi_block;
-      block_buffer_read(fs_device, double_indi_block.indirect_blocks[indirect_block_num], &indi_block);
-      return indi_block.blocks[indirect_block_index];
+      ASSERT(inode->data.double_indirect_blocks != NABLOCK);
+      block_buffer_read(fs_device, inode->data.double_indirect_blocks, double_indi_block);
+      ASSERT(double_indi_block->indirect_blocks[indirect_block_num] != NABLOCK);
+      block_buffer_read(fs_device, double_indi_block->indirect_blocks[indirect_block_num], indi_block);
+      block_sector_t ret = indi_block->blocks[indirect_block_index];
+      free(double_indi_block);
+      free(indi_block);
+      return ret;
     }
     NOT_REACHED();
   }
@@ -110,11 +120,19 @@ void
 inode_init (void) 
 {
   list_init (&open_inodes);
+  memset(ZERO_BLOCK, 0, BLOCK_SECTOR_SIZE);
+  ASSERT(sizeof(struct inode_disk) == BLOCK_SECTOR_SIZE);
+  ASSERT(sizeof(struct indirect_block) == BLOCK_SECTOR_SIZE);
+  ASSERT(sizeof(struct double_indirect_block) == BLOCK_SECTOR_SIZE);
 }
 
 bool allocate_new_direct_disk(struct inode_disk* disk_inode, size_t needed_blocks, bool extend);
 bool allocate_new_indirect_disk(block_sector_t* sector, size_t needed_blocks, bool extend);
 bool allocate_new_double_indirect_disk(struct inode_disk* disk_inode, size_t needed_blocks, bool extend);
+
+/* bool allocate_extend_direct_disk(struct inode_disk* disk_inode, size_t needed_blocks);
+bool allocate_extend_indirect_disk(block_sector_t* sector, size_t needed_blocks);
+bool allocate_extend_double_indirect_disk(struct inode_disk* disk_inode, size_t needed_blocks); */
 
 bool allocate_new_direct_disk(struct inode_disk* disk_inode, size_t needed_blocks, bool extend)
 {
@@ -140,13 +158,15 @@ bool allocate_new_indirect_disk(block_sector_t* sector, size_t needed_blocks, bo
   size_t i;
   struct indirect_block indi_block;
   
-  if(!extend)
+  if(!extend || *sector == NABLOCK)
   {
     if(!free_map_allocate(1, sector)) return false;
     memset(&indi_block, NABLOCK, sizeof(indi_block));
   }  
-  else block_buffer_read(fs_device, *sector, &indi_block);
-  
+  else 
+  { 
+    block_buffer_read(fs_device, *sector, &indi_block);
+  }
   ASSERT (sizeof(struct indirect_block) == BLOCK_SECTOR_SIZE);
 
   for(i = 0; i < needed_blocks; i++)
@@ -172,7 +192,7 @@ bool allocate_new_double_indirect_disk(struct inode_disk* disk_inode, size_t nee
   size_t block_left =  needed_blocks % INDIRECT_BLOCK_NUM; // 마지막 indirect에서 할당해야하는 블럭 수
 
   struct double_indirect_block double_indi_block;
-  if(!extend)
+  if(!extend || disk_inode->double_indirect_blocks == NABLOCK)
   {
     if(!free_map_allocate(1, &disk_inode->double_indirect_blocks)) return false;
     memset(&double_indi_block, NABLOCK, sizeof(double_indi_block));
@@ -299,7 +319,7 @@ inode_create (block_sector_t sector, off_t length, bool is_dir)
   struct inode_disk *disk_inode = NULL;
   bool success = false;
 
-  ASSERT (length >= 0); 
+  ASSERT (length >= 0);
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
@@ -310,18 +330,22 @@ inode_create (block_sector_t sector, off_t length, bool is_dir)
     disk_inode->length = length;
     disk_inode->magic = INODE_MAGIC;
     disk_inode->is_dir = is_dir;
+    memset(disk_inode->direct_blocks, NABLOCK, DIRECT_BLOCK_NUM * sizeof(NABLOCK));
+    disk_inode->indirect_blocks = NABLOCK;
+    disk_inode->double_indirect_blocks = NABLOCK;
     if(allocate_inode_disk(disk_inode, length, false))
     {
       block_buffer_write(fs_device, sector, disk_inode);
       success = true;
     }
     else
-    {
-      free (disk_inode);
       PANIC("ALLOCATION FAIL!\n");
-    }
-      
+
+    free (disk_inode);
   }
+  else
+    return false;
+
   return success;
 }
 
